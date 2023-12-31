@@ -1,6 +1,6 @@
 # main.py
-from strategies.strategya.config import StrategyaConfig
-from engine.driver import EventDriver, Mode
+from core.strategies.strategya.config import StrategyaConfig
+from command.driver import EventDriver, Mode
 
 
 def main():
