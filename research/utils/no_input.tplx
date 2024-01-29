@@ -1,0 +1,6 @@
+%% This is a custom template for nbconvert to exclude code cells from the output.
+
+((*- extends 'article.tplx' -*))
+
+% Exclude code cells
+((* block codecell scoped -*))((* endblock codecell *))
