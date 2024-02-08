@@ -8,6 +8,7 @@ config.yml
 curls.md
 heroku_variables.txt
 __pycache__/
+main.todo
 
 # Django
 /db.sqlite3
@@ -27,8 +28,8 @@ venv_alpha/
 .idea/
 
 # dependencies
-dashboard/node_modules
-dashboard/.pnp
+node_modules/
+.pnp/
 .pnp.js
 
 # testing

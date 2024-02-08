@@ -1,18 +1,24 @@
 # main.py
-from strategies.strategya.config import StrategyaConfig
-from engine.driver import EventDriver, Mode
+from midas.strategies.cointegrationzscore import CointegrationzscoreConfig
+from midas.command import MidasShell, EventController, Mode
 
 
+
+### Development
 def main():
     # Set the mode (LIVE or BACKTEST)
     mode = Mode.BACKTEST
-
     # Initialize the strategy configuration
-    strategy_config = StrategyaConfig(mode)
+    strategy_config = CointegrationzscoreConfig(mode)
 
     # Initialize the event driver
-    event_driver = EventDriver(strategy_config)
+    event_driver = EventController(strategy_config)
     event_driver.run()
 
 if __name__ == "__main__":
     main()
+
+
+### Production 
+# if __name__ == '__main__':
+#     MidasShell().cmdloop()
