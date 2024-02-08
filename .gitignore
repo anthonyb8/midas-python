@@ -28,8 +28,8 @@ venv_alpha/
 .idea/
 
 # dependencies
-engine/utilities/dashboard/node_modules
-engine/utilities/dashboard/.pnp
+node_modules/
+.pnp/
 .pnp.js
 
 # testing

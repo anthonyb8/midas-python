@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from textwrap import dedent
 from typing import Tuple, List, Dict, Any
 
-
 class BacktestPerformance:
     @staticmethod
     def sharpe_ratio(equity_curve: list, risk_free_rate: float = 0.04):
@@ -42,7 +41,7 @@ class BacktestPerformance:
         return df['percent_drawdown'].tolist()
     
     @staticmethod
-    def plot_data_with_signals(data, signals):
+    def plot_data_with_signals(data, signals, show_plot=True):
         plt.figure(figsize=(15, 7))
 
         for symbol in data.columns:
@@ -56,10 +55,12 @@ class BacktestPerformance:
         plt.title("Price Data with Trade Signals")
         plt.xlabel("Timestamp")
         plt.ylabel("Price")
-        plt.show()
+
+        if show_plot:
+            plt.show()
 
     @staticmethod
-    def plot_price_and_spread(price_data:pd.DataFrame, spread:list, signals: list):
+    def plot_price_and_spread(price_data:pd.DataFrame, spread:list, signals: list, split_date=None, show_plot=True):
         """
         Plot multiple ticker data on the left y-axis and spread with mean and standard deviations on the right y-axis.
         
@@ -101,12 +102,28 @@ class BacktestPerformance:
         ax2.set_ylabel('Spread and Statistics')
         ax2.legend(loc='upper right')
 
-        # Plot Signals
+
+        # Plot signals
         for signal in signals:
-            if signal['direction'] == 'LONG':  # Long signal
-                ax1.scatter(signal['timestamp'], price_data.loc[signal['timestamp'], signal['symbol']], color='lime', marker='^', s=100)
-            elif signal['direction'] == 'SHORT':  # Short signal
-                ax1.scatter(signal['timestamp'], price_data.loc[signal['timestamp'], signal['symbol']], color='red', marker='v', s=100)
+            ts = pd.to_datetime(signal['timestamp'])
+            price = signal['price']
+            action = signal['action']
+            if action in ['LONG', 'COVER']:
+                marker = '^'
+                color = 'lime'
+            elif action in ['SHORT', 'SELL']:
+                marker = 'v'
+                color = 'red'
+            else:
+                # Default marker for undefined actions
+                marker = 'o'
+                color = 'gray'
+            ax1.scatter(ts, price, marker=marker, color=color, s=100)
+
+        # Draw a dashed vertical line to separate test and training data
+        if split_date is not None:
+            split_date = pd.to_datetime(split_date)
+            ax1.axvline(x=split_date, color='black', linestyle='--', linewidth=1)
 
         # Add grid lines
         ax1.grid(True)
@@ -120,53 +137,64 @@ class BacktestPerformance:
 
         # Show the plot
         plt.tight_layout()
-        plt.show()
+
+        if show_plot:
+            plt.show()
 
     @staticmethod
-    def plot_equity_curve(equity_curve):
+    def plot_equity_curve(equity_curve, show_plot=True):
         plt.figure(figsize=(12, 6))
         plt.plot(equity_curve, label='Equity Curve')
         plt.title(f"Equity Curve")
         plt.xlabel('Time')
         plt.ylabel('Equity')
         plt.axhline(y=0, color='gray', linestyle='--')
+        plt.grid()
         plt.legend()
-        plt.show()
+        
+        if show_plot:
+            plt.show()
     
     @staticmethod
-    def plot_drawdown_curve(drawdown):
+    def plot_drawdown_curve(drawdown, show_plot=True):
         plt.figure(figsize=(12, 6))
         plt.plot(drawdown, label='Drawdown Curve')
         plt.title(f"Drawdown Curve")
         plt.xlabel('Time')
         plt.ylabel('Drawdown (%)')
         plt.axhline(y=0, color='red', linestyle='--')
+        plt.grid()
         plt.legend()
-        plt.show()
-    
+               
+        if show_plot:
+            plt.show()
+
     @staticmethod
-    def plot_return_curve(drawdown):
+    def plot_return_curve(drawdown, show_plot=True):
         plt.figure(figsize=(12, 6))
         plt.plot(drawdown, label='Return Curve')
         plt.title(f"Return Curve")
         plt.xlabel('Time')
         plt.ylabel('Return (%)')
         plt.axhline(y=0, color='blue', linestyle='--')
+        plt.grid()
         plt.legend()
-        plt.show()
+               
+        if show_plot:
+            plt.show()
     
-    @staticmethod
-    def calculate_metrics(equity_curve):
-        cum_return_curve = BacktestPerformance.cumulative_return(equity_curve)
-        drawdown_curve = BacktestPerformance.drawdown(equity_curve)
+    # @staticmethod
+    # def calculate_metrics(equity_curve):
+    #     cum_return_curve = BacktestPerformance.cumulative_return(equity_curve)
+    #     drawdown_curve = BacktestPerformance.drawdown(equity_curve)
 
-        BacktestPerformance.plot_equity_curve(equity_curve)
-        BacktestPerformance.plot_return_curve(cum_return_curve)
-        BacktestPerformance.plot_drawdown_curve(drawdown_curve)
+    #     BacktestPerformance.plot_equity_curve(equity_curve)
+    #     BacktestPerformance.plot_return_curve(cum_return_curve)
+    #     BacktestPerformance.plot_drawdown_curve(drawdown_curve)
 
-        # Calculate Sharpe ratio using daily returns
-        sharpe_ratio = BacktestPerformance.sharpe_ratio(equity_curve)
-        max_drawdown = min(drawdown_curve)
-        total_return = cum_return_curve[-1]
+    #     # Calculate Sharpe ratio using daily returns
+    #     sharpe_ratio = BacktestPerformance.sharpe_ratio(equity_curve)
+    #     max_drawdown = min(drawdown_curve)
+    #     total_return = cum_return_curve[-1]
 
-        return {'Total Return(%)': total_return, 'Sharpe Ratio': sharpe_ratio, 'Max Drawdown(%)': max_drawdown}
+    #     return {'Total Return(%)': total_return, 'Sharpe Ratio': sharpe_ratio, 'Max Drawdown(%)': max_drawdown}
