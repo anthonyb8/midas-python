@@ -1,26 +1,34 @@
 from queue import Queue
-from midas.order_book import OrderBook
-from midas.events import ExecutionEvent
-from midas.orders import MarketOrder, Action, OrderType, BaseOrder
-from midas.symbols import Symbol, Future, Equity
-from midas.signals import TradeInstruction
 from typing import Dict
 from ibapi.contract import Contract
 from ibapi.order import Order
 import logging
+from datetime import datetime
 
+from midas.order_book import OrderBook
+from midas.events import ExecutionEvent, Action, BaseOrder, TradeInstruction
+from midas.account_data import PositionDetails, AccountDetails, ExecutionDetails, EquityDetails
+from midas.symbols import Symbol, Future, Equity
 
 class DummyBroker:
     def __init__(self, symbols_map: Dict[str, Symbol], event_queue: Queue, order_book:OrderBook, capital:float, logger:logging.Logger,  slippage_factor:int=1):
         self.event_queue = event_queue
+        self.order_book = order_book
+        self.logger = logger
         self.symbols_map = symbols_map
         self.slippage_factor = slippage_factor # multiplied by tick size, so slippage will be x ticks against the position    
-        self.account = {'Timestamp': None, 'AvailableFunds': capital,'EquityValue':capital, "RequiredMargin": 0, "CurrentMargin": 0, "UnrealizedPnl": 0}
-        self.positions = {}
-        self.executions = {}
-        self.last_trade = {} # stored by contract
-        self.logger = logger
-        self.order_book = order_book
+        
+        # self.executions : Dict[str, ExecutionDetails] = {}
+        self.positions : Dict[str, PositionDetails] = {}
+        self.last_trade : Dict[str, ExecutionDetails] = {}
+        self.account : AccountDetails =  {'Timestamp': None, 
+                                          'AvailableFunds': capital,
+                                          'EquityValue' : capital, 
+                                          "RequiredMargin": 0, 
+                                          "CurrentMargin": 0, 
+                                          "UnrealizedPnl": 0
+                                        }
+
         # self.orders = {}
 
     def placeOrder(self, timestamp, trade_instructions: TradeInstruction, action: Action, contract: Contract, order: BaseOrder):
@@ -31,7 +39,7 @@ class DummyBroker:
         commission_fees = self.calculate_commission_fees(contract,quantity)
         self.update_account(contract, action, quantity, fill_price,commission_fees)
 
-        trade_details = self.update_trades(timestamp, trade_instructions,contract, order, fill_price)
+        trade_details = self.update_trades(timestamp, trade_instructions,contract, order, fill_price, commission_fees)
 
         execution_event = ExecutionEvent(timestamp, trade_instructions, action, contract=contract,order=order, trade_details=trade_details)
 
@@ -109,14 +117,14 @@ class DummyBroker:
 
         # If no position then postions is equal to new order attributes
         if contract not in self.positions.keys():
-            self.positions[contract] = {
-                'action': action,
-                'quantity': quantity,
-                'avg_cost': round(fill_price,4),
-                'contract_size': contract_size,      
-                'initial_margin': self.symbols_map[ticker].initialMargin
+            self.positions[contract] = PositionDetails(
+                action= action,
+                quantity= quantity,
+                avg_cost=round(fill_price,4),
+                contract_size= contract_size,      
+                initial_margin= self.symbols_map[ticker].initialMargin
                 # 'total_cost': round(quantity * avg_cost * -1,4) # Cost (-) if a buy, (+) if a sell    
-            }
+            )
         else:
             current_position = self.positions[contract]
             existing_value = current_position['avg_cost'] * current_position['quantity'] * current_position['contract_size']
@@ -176,23 +184,24 @@ class DummyBroker:
 
         return portfolio_value
     
-    def position_value(self, position:dict, current_price:float):
+    def position_value(self, position:PositionDetails, current_price:float):
         initial_margin = position['initial_margin'] * abs(position['quantity'])
         entry_price = position['avg_cost'] # This needs to be correctly sourced]
         pnl = (current_price - entry_price) * position['quantity'] * position['contract_size']
         return pnl + initial_margin
     
-    def update_trades(self, timestamp, trade_instructions:TradeInstruction, contract:Contract, order:BaseOrder, fill_price:float):
-        trade = {
-            "timestamp": timestamp,
-            "trade_id": trade_instructions.trade_id,
-            "leg_id": trade_instructions.leg_id,
-            "symbol": contract.symbol,
-            "quantity": order.quantity,
-            "fill_price": fill_price,
-            "cost":round(fill_price * order.quantity, 2),
-            "action":trade_instructions.action
-        }
+    def update_trades(self, timestamp, trade_instructions:TradeInstruction, contract:Contract, order:BaseOrder, fill_price:float, fees:float):
+        trade = ExecutionDetails(
+            timestamp= timestamp,
+            trade_id= trade_instructions.trade_id,
+            leg_id= trade_instructions.leg_id,
+            symbol= contract.symbol,
+            quantity= order.quantity,
+            price= fill_price,
+            cost= round(fill_price * order.quantity, 2),
+            action= trade_instructions.action,
+            fees= fees
+        )
 
         self.last_trade[contract] = trade
 
@@ -227,18 +236,19 @@ class DummyBroker:
             action = Action.SELL if position['action'] == 'BUY' else Action.COVER
             fill_price = self._fill_price(contract,action)
             quantity = position['quantity'] * -1
-            timestamp = self.order_book.book[contract.symbol]['last_updated']
+            timestamp = self.order_book.book[contract.symbol].TIMESTAMP
 
-            trade = {
-            "timestamp": timestamp,
-            "trade_id": self.last_trade[contract]['trade_id'],
-            "leg_id": self.last_trade[contract]['leg_id'],
-            "symbol": contract.symbol,
-            "quantity": quantity,
-            "fill_price": fill_price,
-            "cost":round(fill_price * quantity, 2),
-            "action":action
-            }
+            trade = ExecutionDetails(
+                timestamp= timestamp,
+                trade_id= self.last_trade[contract]['trade_id'],
+                leg_id= self.last_trade[contract]['leg_id'],
+                symbol= contract.symbol,
+                quantity= quantity,
+                price= fill_price,
+                cost= round(fill_price * quantity, 2),
+                action= action,
+                fees= 0.0 # because not actually a trade
+            )
 
             self.last_trade[contract] = trade
 
@@ -255,6 +265,9 @@ class DummyBroker:
         return self.last_trade
 
     def return_EquityValue(self):
-        return {'EquityValue' : self.account['EquityValue']}
+        return EquityDetails(
+                timestamp= self.account['Timestamp'],
+                equity_value = self.account['EquityValue']
+                )
         
    

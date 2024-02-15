@@ -1,6 +1,6 @@
 # strategy_a/config.py
 from midas.symbols import Equity, Future, Currency, Exchange, Symbol
-from midas.market_data import MarketDataType
+from zextra.market_data import MarketDataType
 from midas.command import Config, Mode, Parameters
 from .logic import Cointegrationzscore
 
@@ -9,6 +9,7 @@ class CointegrationzscoreConfig(Config):
 
         params = Parameters(
             strategy_name='cointegrationzscore',
+            missing_values_strategy='drop',
             train_start="2018-05-18",
             train_end="2023-01-19",
             test_start="2023-01-19",
@@ -19,7 +20,8 @@ class CointegrationzscoreConfig(Config):
             symbols = [
                 Future(ticker="HE.n.0",currency=Currency.USD,exchange=Exchange.SMART,fees=0.85, lastTradeDateOrContractMonth="continuous",contractSize=50,tickSize=0.25, initialMargin=4564.17),
                 Future(ticker="ZC.n.0",currency=Currency.USD,exchange=Exchange.CME,fees=0.85,lastTradeDateOrContractMonth="continuous",contractSize=50,tickSize=0.25, initialMargin=2056.75)
-            ]
+            ], 
+            benchmark=['^GSPC']
         )  
     
         super().__init__(mode, params)

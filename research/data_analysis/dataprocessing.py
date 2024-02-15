@@ -33,7 +33,7 @@ class DataProcessing:
         start_date = "2018-05-18"
         end_date = "2023-01-19"
         """
-        response = database.get_price_data(symbols, start_date, end_date)
+        response = database.get_bar_data(symbols, start_date, end_date)
         self.raw_data = pd.DataFrame(response)
 
         self.process_data()
@@ -54,8 +54,8 @@ class DataProcessing:
         self.check_missing(self.processed_data)
 
         # Reindex the DataFrame using the custom business day frequency ** Sets to daily data **
-        us_business_day = CustomBusinessDay(calendar=USFederalHolidayCalendar())
-        self.processed_data = self.processed_data.reindex(pd.date_range(start=self.processed_data.index.min(), end=self.processed_data.index.max(), freq=us_business_day))
+        # us_business_day = CustomBusinessDay(calendar=USFederalHolidayCalendar())
+        # self.processed_data = self.processed_data.reindex(pd.date_range(start=self.processed_data.index.min(), end=self.processed_data.index.max(), freq=us_business_day))
 
     @staticmethod   
     def lag_series(series:pd.Series,lag:int=1):
@@ -80,7 +80,7 @@ class DataProcessing:
         missing_values = data[data.isna().any(axis=1)]
         if not missing_values.empty:
             print("There are missing values in the DataFrame:")
-            print(missing_values)
+            # print(missing_values)
         else:
             print("No missing values in the DataFrame.")
 
@@ -130,3 +130,25 @@ class DataProcessing:
         plt.show()
 
         return residuals_linear, np.exp(residuals_log_exp) - values
+
+
+if __name__ == "__main__":
+
+    from midas.symbols import Symbol, Equity, Future, Currency, Exchange
+    # Step 1 : Set data parameters
+    start_date = "2024-02-06"
+    end_date = "2024-02-07"
+
+    symbols = [
+                Future(ticker="HE.n.0",currency=Currency.USD,exchange=Exchange.SMART, fees=0.85, lastTradeDateOrContractMonth="continuous",contractSize=50,tickSize=0.25, initialMargin=4564.17),
+                Future(ticker="ZC.n.0",currency=Currency.USD,exchange=Exchange.CME,fees=0.85,lastTradeDateOrContractMonth="continuous",contractSize=50,tickSize=0.25, initialMargin=2056.75)
+            ]
+
+    symbols_map = {symbol.ticker: symbol for symbol in symbols}
+    
+    # Step 2 : Retrieve Data
+    data_processing = DataProcessing()
+    data = data_processing.get_data(list(symbols_map.keys()), start_date,end_date)
+    data.dropna(inplace=True)
+    
+    print(data)

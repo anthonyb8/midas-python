@@ -1,8 +1,8 @@
 from queue import Queue
 import pandas as pd
-from typing import List,Dict
-from midas.market_data import BarData
-from midas.events import MarketDataEvent
+from typing import Dict
+
+from midas.events import MarketEvent, BarData
 from midas.symbols import Symbol
 from midas.tools import DatabaseClient
 
@@ -26,7 +26,7 @@ class DataClient(DatabaseClient):
         self.next_date = None
         self.current_date_index = -1
 
-    def get_data(self, symbols_map:Dict[str, Symbol], start_date: str, end_date: str):
+    def get_data(self, symbols_map:Dict[str, Symbol], start_date: str, end_date: str, missing_values_strategy: str = 'fill_forward'):
         """
         Retrieves data from the database and initates the data processing. Stores initial data response in self.price_log.
 
@@ -34,33 +34,58 @@ class DataClient(DatabaseClient):
             symbols (List[str]) : A list of tickers ex. ['AAPL', 'MSFT']
             start_date (str) : Beginning date for the backtest ex. "2023-01-01"
             end_date (str) : End date for the backtest ex. "2024-01-01"
+            missing_values_strategy (str): Strategy to handle missing values ('drop' or 'fill_forward'). Default is 'fill_forward'.
         """
         tickers = list(symbols_map.keys())
-        response = self.data_client.get_price_data(symbols=tickers, start_date=start_date, end_date=end_date)
+        response = self.data_client.get_bar_data(tickers=tickers, start_date=start_date, end_date=end_date)
         self.price_log = response
 
         # Process the data
-        self.data = pd.DataFrame(response)
+        data = pd.DataFrame(response)
 
+        # Handle missing values based on the specified strategy
+        # if missing_values_strategy == 'drop':
+        #     data.dropna(inplace=True)
+        # elif missing_values_strategy == 'fill_forward':
+        #     data.fillna(method='ffill', inplace=True)
+        
         # # Extract contract details for mapping
         # contracts_map = {symbol: symbols_map[symbol].contract for symbol in symbols_map}
         # self.data['contract'] = self.data['symbol'].map(contracts_map)
 
-        self.process_data()
+        self.process_data(data, missing_values_strategy)
 
-    def process_data(self):
+    def process_data(self, data:pd.DataFrame, missing_values_strategy: str = 'fill_forward'):
         """ Transform the data provide by the database into the needed format for the backtest. """
         # Convert the 'timestamp' column to datetime objects
-        self.data['timestamp'] = pd.to_datetime(self.data['timestamp'])
+        data['timestamp'] = pd.to_datetime(data['timestamp'])
 
         # Convert OHLCV columns to floats
         ohlcv_columns = ['open', 'high', 'low', 'close', 'volume']
         for col in ohlcv_columns:
-            self.data[col] = self.data[col].astype(float)
+            data[col] = data[col].astype(float)
+
+
+  
+        data = data.pivot(index='timestamp', columns='symbol')
+        
+        # Handle missing values based on the specified strategy
+        if missing_values_strategy == 'drop':
+            data.dropna(inplace=True)
+        elif missing_values_strategy == 'fill_forward':
+            data.fillna(method='ffill', inplace=True)
+
+        data = data.stack(level='symbol').reset_index()
+
+        # Step 2: Rename columns to match the original format's naming conventions
+        data.rename(columns={'level_1': 'symbol'}, inplace=True)
+
+        # Optional: Sort by timestamp and symbol for better readability
+        data.sort_values(by=['timestamp', 'symbol'], inplace=True)
 
         # Sorting the DataFrame by the 'timestamp' column in ascending order
-        self.data = self.data.sort_values(by='timestamp', ascending=True).reset_index(drop=True)
-        
+        self.data = data.sort_values(by='timestamp', ascending=True).reset_index(drop=True)
+
         # Storing unique dates if needed
         self.unique_dates = self.data['timestamp'].unique().tolist()
 
@@ -78,7 +103,7 @@ class DataClient(DatabaseClient):
             ticker = row['symbol']
             result_dict[ticker] = BarData.from_series(row) 
 
-        self.event_queue.put(MarketDataEvent(result_dict))
+        self.event_queue.put(MarketEvent(result_dict))
 
     def data_stream(self):
         """
@@ -94,15 +119,6 @@ class DataClient(DatabaseClient):
         self.set_market_data()
         return True
 
-    # def get_last_bar(self):
-    #     last_bar = self.data[self.data['timestamp'] == self.next_date]
-
-    #     result_dict = {}
-    #     for idx, row in last_bar.iterrows():
-    #         symbol = row['symbol']
-    #         result_dict[symbol] = BarData.from_series(row) 
-
-    #     return MarketDataEvent(result_dict)
         
 
 

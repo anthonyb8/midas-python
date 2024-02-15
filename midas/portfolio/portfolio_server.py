@@ -1,33 +1,11 @@
-from .performance import PerformanceManager
-from midas.symbols import Symbol
-from typing import Dict
 import logging
+from typing import Dict
+from ibapi.contract import Contract
 
-class Position:
-    def __init__(self, action:str, avg_cost:float, quantity:int, total_cost: float=None, margin:float=None):
-        self.action = action # BUY/SELL
-        self.avg_cost = avg_cost
-        self.quantity = quantity
-        self.total_cost = total_cost
-        self.margin = margin
-
-    def __eq__(self, other):
-        # Check if all attributes, including total_cost, are equal
-        return (self.action == other.action and
-                self.avg_cost == other.avg_cost and
-                self.quantity == other.quantity and
-                self.total_cost == other.total_cost and  # Include this in your comparison
-                self.margin == other.margin)
-
-
-class ActiveOrder:
-    def __init__(self, contract:dict, action:str, avg_price:float, quantity:int):
-        self.action = action # LONG/SHORT
-        self.contract = contract
-        self.avg_price = avg_price
-        self.quantity = quantity
-        self.mkt_value = self.avg_price * self.quantity # Delete after debug
-
+from midas.symbols import Symbol
+from midas.events import  Trade
+from midas.account_data import Position,ActiveOrder, AccountDetails, EquityDetails
+from .performance import PerformanceManager
 
 class PortfolioServer:
     """
@@ -41,21 +19,19 @@ class PortfolioServer:
         Class constructor.
 
         Args:
-            portfolio_client (PortfolioClient) : Inheritres the backtest portfolio client, so it can easily return portfoli related data to the engine.
+            portfolio_client (PortfolioClient) : Inherites the backtest portfolio client, so it can easily return portfoli related data to the engine.
         """
-        self.capital = None
-        self.margin_requirement = 0
-        self.margin = 0
-        self.positions = {}
-        self.active_orders = {}
-        self.account = {}
+        self.performance_manager = performance_manager
         self.symbols_map = symbols_map
         self.logger = logger
-        self.performance_manager = performance_manager
+        # self.margin_requirement = 0
+        # self.margin = 0
+        self.capital = None
+        self.account : AccountDetails = {}
+        self.positions : Dict[Contract, Position] = {}
+        self.active_orders : Dict[int, ActiveOrder] = {}
 
-    def update_positions(self, contract, position_data):
-        new_position = Position(position_data['action'], position_data['avg_cost'], position_data['quantity'], margin=position_data['initial_margin'])
-
+    def update_positions(self, contract:Contract, new_position: Position):
         # Check if this position exists and is equal to the new position
         if contract.symbol in self.positions and self.positions[contract.symbol] == new_position:
             # Positions are identical, do nothing
@@ -66,6 +42,7 @@ class PortfolioServer:
             self.logger.info(f"\nPositions Updated: \n{self.output_positions()}")
 
         
+        # new_position = Position(position_data['action'], position_data['avg_cost'], position_data['quantity'], margin=position_data['initial_margin'])
         # self.positions[contract.symbol] = Position(position_data['action'],position_data['avg_cost'], position_data['quantity'],margin= position_data['initial_margin'])
         # self.logger.info(f"\nPositions Updated: \n{self.output_positions()}")
     
@@ -75,16 +52,16 @@ class PortfolioServer:
             string += f" {contract}: {position.__dict__} \n"
         return string
     
-    def update_orders(self, **orders):
+    def update_orders(self, order:ActiveOrder):
         # If the status is 'Cancelled' and the order is present in the dict, remove it
-        if orders['status'] == 'Cancelled' or orders['status'] == 'Filled' and orders['permId'] in self.active_orders:
-            del self.active_orders[orders['permId']]
+        if order.status == 'Cancelled' or order.status == 'Filled' and order.permId in self.active_orders:
+            del self.active_orders[order.permId]
         # If not cancelled, either update the existing order or add a new one
-        elif orders['status'] != 'Cancelled' and orders['status'] != 'Filled':
-            if orders['permId'] not in self.active_orders:
-                self.active_orders[orders['permId']] = orders
+        elif order.status != 'Cancelled' and order.status != 'Filled':
+            if order.permId not in self.active_orders:
+                self.active_orders[order.permId] = order
             else:
-                self.active_orders[orders['permId']].update(orders)
+                self.active_orders[order.permId].update(order)
 
         self.logger.info(f"\nOrder Updated: \n{self.ouput_orders()}")
 
@@ -94,17 +71,14 @@ class PortfolioServer:
             string += f" {order} \n"
         return string
 
-    def update_trades(self, **trade):
-        self.performance_manager.update_trades(**trade)
+    def update_trades(self, trade:Trade):
+        self.performance_manager.update_trades(trade)
 
-    def update_account_details(self, account_details:dict):
-        for key, value in account_details.items():
-            if key == 'AvailableFunds':
-                self.capital = float(value)
-            elif 'EquityValue' == key:
-                self.performance_manager.update_equity(account_details['Timestamp'], value)
-            
-            self.account[key] = value
+    def update_account_details(self, account_details:AccountDetails):
+        self.account = account_details
+        self.capital = float(self.account['AvailableFunds'])
+        self.update_equity(EquityDetails(timestamp = account_details['Timestamp'],equity_value= self.account['EquityValue']))
+
         self.logger.info(f"\nAccount Updated: \n{self.output_account()}")
     
     def output_account(self):
@@ -112,10 +86,9 @@ class PortfolioServer:
         for key, value in self.account.items():
             string += f" {key} : {value} \n"
         return string
-
-    # def update_capital(self, capital:float):
-    #     self.capital = capital
-    #     self.logger.info(f"\nCapital Updated: \n{self.capital}")
+    
+    def update_equity(self, equity_details:EquityDetails):
+        self.performance_manager.update_equity(equity_details)
 
     def update_margin_requirement(self):
         pass
@@ -125,13 +98,6 @@ class PortfolioServer:
 
     def calculate_statistics(self):
         self.performance_manager.calculate_statistics()
-
-
-
-
-
-
-
 
 
 

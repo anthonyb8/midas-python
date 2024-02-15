@@ -5,18 +5,31 @@ import pandas as pd
 from enum import Enum
 from datetime import datetime, timedelta
 
+
+class AssetClass(Enum):
+    EQUITY = 'EQUITY'
+    COMMODITY = 'COMMODITY'
+    FIXED_INCOME ='FIXED_INCOME'
+    FOREX='FOREX'
+    CRYPTOCURRENCY='CRYPTOCURRENCY'
+    
 class SecurityType(Enum):
     EQUITY = 'EQUITY'
     FUTURE = 'FUTURE'
     OPTION = 'OPTION'
+    INDEX = 'INDEX'
 
 class Exchange(Enum):   
-    NASDAQ='NASDAQ'
-    CME='CME'                   
+    NASDAQ = 'NASDAQ'
+    CME = 'CME'                   
 
 class Currency(Enum):   
     USD='USD'
-    CAD='CAD'              
+    CAD='CAD'   
+    EUR='EUR'
+    GBP='GBP'
+    AUD='AUD'           
+    JPY='JPY'
 
 class Indsutry(Enum):
     # Equities
@@ -49,10 +62,245 @@ class DatabaseClient:
         self.api_url = api_url
         self.api_key = api_key
 
+    # -- Helper Data -- 
+    def create_asset_class(self, **asset_class_data):
+        """
+        Creates a new asset class.
+
+        Parameters:
+        asset_class_data (dict):
+            name (str): The name of the asset class.
+            description (str): The description of the asset class.
+        """
+        required_keys = {
+            "name": AssetClass,
+            "description": str,  
+        }
+
+        # Check for missing required keys and type validation
+        for key, expected_type in required_keys.items():
+            if key not in asset_class_data:
+                raise ValueError(f"{key} is required.")
+            if not isinstance(asset_class_data[key], expected_type):
+                raise TypeError(f"Incorrect type for {key}. Expected {expected_type.__name__}, got {type(asset_class_data[key]).__name__}")
+
+        # Prepare the data payload
+        data = {
+            "name": asset_class_data['name'].value,
+            "description": asset_class_data['description']
+        }
+
+        url = f"{self.api_url}/api/asset_class/"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code != 201:
+            raise ValueError(f"Asset class creation failed: {response.text}")
+        return response.json() 
+    
+    def get_asset_classes(self):
+        """
+        Retrieves all asset classes.
+        """
+        url = f"{self.api_url}/api/asset_class/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Fetching asset classes failed: {response.text}")
+        return response.json()
+    
+    def update_asset_class(self, asset_class_id: int, **updates):
+        """
+        Updates the description of an existing asset class.
+
+        Parameters:
+        asset_class_id (int): The ID of the asset class to update.
+        description (str): The new description for the asset class.
+        """
+        url = f"{self.api_url}/api/asset_class/{asset_class_id}/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        data = updates
+        response = requests.patch(url, json=data, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Asset class update failed: {response.text}")
+        return response.json()
+
+    def create_currency(self, **currency_data):
+        """
+        Creates a new currency.
+
+        Parameters:
+        currency_data(dict):
+            code (str): The currency code (e.g., USD).
+            name (str): The name of the currency (e.g., US Dollar).
+            region (str): The region or country where the currency is used.
+        """
+        required_keys = {
+            "code": Currency, 
+            "name": str, 
+            "region": str
+        }
+
+        # Check for missing required keys and type validation
+        for key, expected_type in required_keys.items():
+            if key not in currency_data:
+                raise ValueError(f"{key} is required.")
+            if not isinstance(currency_data[key], expected_type):
+                raise TypeError(f"Incorrect type for {key}. Expected {expected_type.__name__}, got {type(currency_data[key]).__name__}")
+        
+        
+        data = {
+            "code": currency_data['code'].value,
+            "name": currency_data['name'],
+            "region": currency_data['region']
+        }
+
+        url = f"{self.api_url}/api/currency/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code != 201:
+            raise ValueError(f"Currency creation failed: {response.text}")
+        return response.json()
+
+    def get_currencies(self):
+        """
+        Retrieves all currencies.
+        """
+        url = f"{self.api_url}/api/currency/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Fetching currencies failed: {response.text}")
+        return response.json()
+
+    def update_currency(self, currency_id: int, **updates):
+        """
+        Updates information for an existing currency.
+
+        Parameters:
+        currency_id (int): The ID of the currency to update.
+        **updates: Arbitrary number of keyword arguments representing the fields to update.
+        """
+        url = f"{self.api_url}/api/currency/{currency_id}/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        data = updates
+        response = requests.patch(url, json=data, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Currency update failed: {response.text}")
+        return response.json()
+    
+    
+    # -- Indexes -- 
+    def create_index(self, **index_data):
+        """
+        Creates a new index.
+
+        Parameters:
+        index_data (dict):
+            ticker (str): The ticker symbol of the benchmark.
+            security_type (str): The type of security, e.g., "BENCHMARK".
+            name (str): The name of the benchmark.
+            asset_class (str): The asset class the benchmark belongs to.
+            currency (str): The currency of the benchmark.
+        """
+        required_keys = {
+            "ticker": str, 
+            "security_type": SecurityType,  
+            "name": str, 
+            "asset_class": AssetClass, 
+            "currency":Currency
+        }
+
+        # Check for missing required keys and type validation
+        for key, expected_type in required_keys.items():
+            if key not in  index_data:
+                raise ValueError(f"{key} is required.")
+            if not isinstance(index_data[key], expected_type):
+                raise TypeError(f"Incorrect type for {key}. Expected {expected_type.__name__}, got {type(index_data[key]).__name__}")
+
+        data = {
+            "symbol_data": {
+                "ticker": index_data['ticker'],
+                "security_type": index_data['security_type'].value
+            },
+            "name": index_data['name'],
+            "asset_class": index_data['asset_class'].value,
+            "currency": index_data['currency'].value
+        }
+
+        url = f"{self.api_url}/api/indexes/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code != 201:
+            raise ValueError(f"Benchmark creation failed: {response.text}")
+        return response.json()
+    
+    def get_indexes(self):
+        """
+        Retrieves all benchmarks.
+        """
+        url = f"{self.api_url}/api/indexes/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Fetching benchmarks failed: {response.text}")
+        return response.json()
+
+    def update_index(self, index_id: int, **updates):
+        """
+        Updates information for an existing benchmark.
+
+        Parameters:
+        benchmark_id (int): The ID of the benchmark to update.
+        **updates: Arbitrary number of keyword arguments representing the fields to update.
+        """
+        url = f"{self.api_url}/api/indexes/{index_id}/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        data = updates
+        response = requests.patch(url, json=data, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Index update failed: {response.text}")
+        return response.json()
+
+    # -- Equity -- 
     def create_equity(self, **equity_data):
         """
         **equity_data = {
-            "symbol": str,
+            "ticker": str,
             "security_type": SecurityType,  
             "company_name": str,
             "exchange": Exchange,       
@@ -64,7 +312,7 @@ class DatabaseClient:
         
         """
         required_keys = {
-            "symbol": str,
+            "ticker": str,
             "security_type": SecurityType,  
             "company_name": str,
             "exchange": Exchange,       
@@ -83,8 +331,8 @@ class DatabaseClient:
 
         # Prepare the data payload
         data = {
-            "asset_data": {
-                "symbol": equity_data["symbol"],
+            "symbol_data": {
+                "ticker": equity_data["ticker"],
                 "security_type": equity_data["security_type"].value
             },
             "company_name": equity_data["company_name"],
@@ -102,10 +350,46 @@ class DatabaseClient:
             raise ValueError(f"Asset creation failed: {response.text}")
         return response.json()
 
+    def get_equity(self):
+        """
+        Retrieves all benchmarks.
+        """
+        url = f"{self.api_url}/api/equities/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Fetching benchmarks failed: {response.text}")
+        return response.json()
+
+    def update_equity(self, equity_id: int, **updates):
+        """
+        Updates information for an existing benchmark.
+
+        Parameters:
+        benchmark_id (int): The ID of the benchmark to update.
+        **updates: Arbitrary number of keyword arguments representing the fields to update.
+        """
+        url = f"{self.api_url}/api/equities/{equity_id}/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        data = updates
+        response = requests.patch(url, json=data, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Equity update failed: {response.text}")
+        return response.json()
+
+    # -- Future --
     def create_future(self, **future_data):
         """    
         future_data = {
-            "symbol": str,
+            "ticker": str,
             "security_type": SecurityType,  
             "product_code":str,
             "product_name": str,
@@ -120,7 +404,7 @@ class DatabaseClient:
         """
         
         required_keys = {
-            "symbol": str,
+            "ticker": str,
             "security_type": SecurityType,  
             "product_code":str,
             "product_name": str,
@@ -141,8 +425,8 @@ class DatabaseClient:
                 raise TypeError(f"Incorrect type for {key}. Expected {expected_type.__name__}, got {type(future_data[key]).__name__}")
         
         data = {
-                'asset_data': {
-                    'symbol': future_data['symbol'],
+                'symbol_data': {
+                    'ticker': future_data['ticker'],
                     'security_type': future_data['security_type'].value
                     },
 
@@ -164,10 +448,46 @@ class DatabaseClient:
         if response.status_code != 201:
             raise ValueError(f"Asset creation failed: {response.text}")
         return response.json()
+    
+    def get_future(self):
+        """
+        Retrieves all benchmarks.
+        """
+        url = f"{self.api_url}/api/futures/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Fetching benchmarks failed: {response.text}")
+        return response.json()
+    
+    def update_future(self, future_id: int, **updates):
+        """
+        Updates information for an existing benchmark.
 
-    def get_asset_by_symbol(self, symbol: str):
-        url = f"{self.api_url}/api/assets/"
-        params = {'symbol': symbol}
+        Parameters:
+        benchmark_id (int): The ID of the benchmark to update.
+        **updates: Arbitrary number of keyword arguments representing the fields to update.
+        """
+        url = f"{self.api_url}/api/futures/{future_id}/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        data = updates
+        response = requests.patch(url, json=data, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Equity update failed: {response.text}")
+        return response.json()
+
+    # -- Symbol -- 
+    def get_symbol_by_ticker(self, ticker: str):
+        url = f"{self.api_url}/api/symbols/"
+        params = {'ticker': ticker}
         headers = {'Authorization': f'Token {self.api_key}'}
         response = requests.get(url, params=params, headers=headers)
 
@@ -178,8 +498,8 @@ class DatabaseClient:
         else:
             raise ValueError(f"Failed to retrieve asset by symbol: {response.text}")
     
-    def get_assets(self):
-        url = f"{self.api_url}/api/assets/"
+    def get_symbol(self):
+        url = f"{self.api_url}/api/symbols/"
         headers = {'Authorization': f'Token {self.api_key}'}
         response = requests.get(url, headers=headers)
 
@@ -187,15 +507,54 @@ class DatabaseClient:
             raise ValueError(f"Failed to retrieve assets: {response.text}")
         return response.json()
     
-    def create_price_data(self, price_data: Dict):
-        url = f"{self.api_url}/api/bardata/"
-        headers = {'Authorization': f'Token {self.api_key}'}
-        response = requests.post(url, json=price_data, headers=headers)
+    # -- Bar Data -- 
+    def create_bar_data(self, **bar_data):
+        """
+        Creates new bar data.
 
+        Parameters:
+        bar_data (dict): The bar data to be created with required keys.
+            symbol (str)
+            timestamp (str)  
+            open (float)
+            close (float)
+            high (float)
+            low (float)
+            volume (float)
+        """
+        # Define the required keys and their expected types
+        required_keys = {
+            "symbol": str,
+            "timestamp": str,  # Assuming timestamp is a string; adjust the type as needed
+            "open": float,
+            "close": float,
+            "high": float,
+            "low": float,
+            "volume": int,  # Adjust types based on your specific requirements
+        }
+
+        # Check for missing required keys and type validation
+        for key, expected_type in required_keys.items():
+            if key not in bar_data:
+                raise ValueError(f"{key} is required.")
+            if not isinstance(bar_data[key], expected_type):
+                raise TypeError(f"Incorrect type for {key}. Expected {expected_type.__name__}, got {type(bar_data[key]).__name__}")
+
+        # Prepare the data payload by filtering bar_data against required_keys
+        data = {key: bar_data[key] for key in required_keys}
+
+        url = f"{self.api_url}/api/bardata/"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        response = requests.post(url, json=data, headers=headers)
+
+        # Handle the response
         if response.status_code != 201:
-            raise ValueError(f"Price data creation failed: {response.text}")
+            raise ValueError(f"Bar data creation failed: {response.text}")
         return response.json()
-    
+
     def create_bulk_price_data(self, bulk_data: List[Dict]):
         batch_size = 400
         total_batches = len(bulk_data) // batch_size + (1 if len(bulk_data) % batch_size > 0 else 0)
@@ -213,7 +572,7 @@ class DatabaseClient:
             response = requests.post(url, json=current_batch, headers=headers)
 
             if response.status_code != 201:
-                raise ValueError(f"Bulk price data creation failed for batch {batch_number + 1}: {response.text}")
+                raise ValueError(f"Bulk bar data creation failed for batch {batch_number + 1}: {response.text}")
             
             all_responses.append(response.json())
 
@@ -224,7 +583,7 @@ class DatabaseClient:
         }
         return aggregated_response
     
-    def get_price_data(self, symbols: List[str], start_date: str = None, end_date: str = None):
+    def get_bar_data(self, tickers: List[str], start_date: str = None, end_date: str = None):
         if start_date is None or end_date is None:
             raise ValueError("Start date and end date must be provided for batching")
 
@@ -240,17 +599,16 @@ class DatabaseClient:
             # Adjust the end date to avoid including it in the next batch
             adjusted_end_date = (current_end - timedelta(days=1)).strftime('%Y-%m-%d') if current_end != end else current_end.strftime('%Y-%m-%d')
 
-            batch_data = self._fetch_batch_data(symbols, current_start.strftime('%Y-%m-%d'), adjusted_end_date)
+            batch_data = self._fetch_batch_data(tickers, current_start.strftime('%Y-%m-%d'), adjusted_end_date)
             all_data.extend(batch_data)
             # Set the start of the next batch to the day after the current batch's end
             current_start = current_end
-        
         return all_data 
 
-    def _fetch_batch_data(self, symbols, start_date, end_date):
+    def _fetch_batch_data(self, tickers:list, start_date, end_date):
         url = f"{self.api_url}/api/bardata/"
         params = {
-            'symbols': ','.join(symbols),
+            'tickers': ','.join(tickers),
             'start_date': start_date,
             'end_date': end_date
         }
@@ -258,10 +616,35 @@ class DatabaseClient:
         response = requests.get(url, params=params, headers=headers)
 
         if response.status_code != 200:
-            raise ValueError(f"Failed to retrieve price data for batch {start_date} to {end_date}: {response.text}")
+            raise ValueError(f"Failed to retrieve bar data for batch {start_date} to {end_date}: {response.text}")
 
         return response.json()
     
+    def update_bar_data(self, bar_id: int, **updates):
+        """
+        Updates information for an existing benchmark.
+
+        Parameters:
+        benchmark_id (int): The ID of the benchmark to update.
+        **updates: Arbitrary number of keyword arguments representing the fields to update.
+        """
+        url = f"{self.api_url}/api/bardata/{bar_id}/"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+        data = updates
+        response = requests.patch(url, json=data, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Equity update failed: {response.text}")
+        return response.json()
+
+    def get_benchmark_data(self, tickers: List[str], start_date: str = None, end_date: str = None):
+        data = self.get_bar_data(tickers, start_date, end_date)
+        return [{'timestamp': item['timestamp'], 'close': item['close']} for item in data]
+
+    # -- Backtest Data -- 
     def create_backtest(self, data):
         """
         Create a new backtest.
@@ -304,3 +687,23 @@ class DatabaseClient:
         return response.json()
 
    
+
+      # def get_bar_data(self, tickers: List[str], start_date: str = None, end_date: str = None):
+    #     url = f"{self.api_url}/api/bardata/"
+    #     params = {
+    #         'tickers': ','.join(tickers),
+    #         'start_date': start_date,
+    #         'end_date': end_date
+    #     }
+
+    #     headers = {
+    #         'Authorization': f'Token {self.api_key}',
+    #         'Content-Type': 'application/json',
+    #         'Accept': 'application/json'
+    #         }
+    #     response = requests.get(url, params=params, headers=headers)
+        
+    #     if response.status_code != 200:
+    #         raise ValueError(f"Failed to retrieve bar data for batch {start_date} to {end_date}: {response.text}")
+
+    #     return response.json()

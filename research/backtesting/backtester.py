@@ -6,11 +6,11 @@ from ibapi.order import Order
 from ibapi.contract import Contract
 from typing import Tuple, List, Dict, Any
 
-from midas.signals import TradeInstruction
+from midas.events import TradeInstruction, Action
 from midas.portfolio import Position
 from midas.strategies import BaseStrategy
 from midas.symbols import Symbol
-from midas.orders import Action
+
 
 from .performance import BacktestPerformance
 from .report import HTMLReportGenerator
@@ -103,7 +103,7 @@ class Backtest(BacktestPerformance):
         for i in range(1, total_segments + 1):
             current_window_data = self.full_data.iloc[:segment_size * i]
             train_data, test_data = self.split_data(current_window_data)
-            
+            print(len(train_data),len(test_data))
             segment_summary = {
                 'Segment': i,
                 'Initial Capital': self.initial_capital,
@@ -141,6 +141,7 @@ class Backtest(BacktestPerformance):
 
                 oldest_timestamp = test_data.index.min()
                 # self.plot_price_and_spread(current_window, self.strategy.historical_zscore,signals, oldest_timestamp, show_plot=True)
+                # print(len(current_window), len(self.strategy.historical_zscore))
                 self.report_generator.add_image(self.plot_price_and_spread,current_window, self.strategy.historical_zscore,signals, oldest_timestamp, show_plot=False)
                 results[(entry_threshold, exit_threshold)] = self.calculate_metrics(equity_curve, return_plots=True)
 
@@ -181,7 +182,7 @@ class FuturesBacktest(Backtest):
                     
                     # Update Positions
                     self.update_positions(trades)
-                    positions_details = "\n ".join([f"{position}: {{'action': {details['action'].name}, 'quantity': {details['quantity']}, 'avg_cost': {details['avg_cost']}, 'contract_size': {details['contract_size']}, 'initial_margin': {details['initial_margin']}}}"
+                    positions_details = "\n ".join([f"{position}: {{'action': {details['action']}, 'quantity': {details['quantity']}, 'avg_cost': {details['avg_cost']}, 'contract_size': {details['contract_size']}, 'initial_margin': {details['initial_margin']}}}"
                                                     for position, details in self.positions.items()
                                                     ])
                     self.logger.info(f"{timestamp} -\nPositions:\n {positions_details}")
@@ -235,16 +236,15 @@ class FuturesBacktest(Backtest):
             # Adjust quantity based on the trade allocation
             if action in [Action.LONG, Action.SHORT]:  # Entry signal
                 quantity = trade_allocation / (current_price * contract_size)
-            if action == Action.LONG:
-                quantity_factor = 1
-            elif action == Action.SHORT:
-                quantity_factor = -1
+                if action == Action.LONG:
+                    quantity_factor = 1
+                elif action == Action.SHORT:
+                    quantity_factor = -1
             elif action in [Action.SELL, Action.COVER]:  # Exit signal
-                quantity = self.positions[ticker].quantity
-            if action == Action.SELL:
-                quantity_factor = 1
-            elif action == Action.COVER:
+                # print(self.positions[ticker])
+                quantity = self.positions[ticker]['quantity']
                 quantity_factor = -1
+
         
             quantity = quantity * quantity_factor
 
@@ -308,7 +308,9 @@ class FuturesBacktest(Backtest):
             contract_size = trade['contract_size']
             avg_cost = trade['avg_cost']
             quantity = trade['quantity']
-            action = trade['action']
+            action = trade['action'].to_broker_standard() # Buy or sell
+            print(ticker,trade['action'],action, quantity)
+            
 
              # If no position then postions is equal to new order attributes
             if ticker not in self.positions.keys():
@@ -326,6 +328,7 @@ class FuturesBacktest(Backtest):
                 existing_value = current_position['avg_cost'] * current_position['quantity'] * current_position['contract_size']
                 added_value = avg_cost * quantity * contract_size
                 net_quantity = current_position['quantity'] + quantity
+                print(current_position['quantity'],  quantity)
 
                 # If nets the old position ot 0 the position no longer exists
                 if net_quantity == 0:

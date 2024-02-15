@@ -1,7 +1,6 @@
-from .config import Config, Mode
-from midas.events import MarketDataEvent, OrderEvent, SignalEvent, ExecutionEvent
 from datetime import datetime
-from .parameters import Parameters
+from .config import Config, Mode
+from midas.events import MarketEvent, OrderEvent, SignalEvent, ExecutionEvent
 
 
 class EventController:
@@ -35,21 +34,10 @@ class EventController:
         # Backtest-specific variables
         self.dummy_broker = config.dummy_broker
         
-        
-        # self.parameters = config.parameters
-        # self.strategy_name = config.strategy_name
-        # # self.dashboard = config.dashboard
-        # # self._capital = config.capital
-        # # self._start_date = config.start_date
-        # # self._end_date = config.end_date
-        # # self.symbols = config.symbols
-        # # self.parameters = config.parameters
-
     def run(self):
         if self.mode == Mode.LIVE:
             self.run_live()
         elif self.mode == Mode.BACKTEST:
-            # self.backtest = BacktestManager()
             self.run_backtest()
   
     def run_live(self):
@@ -58,7 +46,7 @@ class EventController:
                 event = self.event_queue.get()
                 self.logger.info(event)
 
-                if isinstance(event, MarketDataEvent):
+                if isinstance(event, MarketEvent):
                     self.order_book.on_market_data(event)
                     self.strategy.handle_market_data()
 
@@ -76,7 +64,7 @@ class EventController:
                 event = self.event_queue.get()
                 self.logger.info(event)
 
-                if isinstance(event, MarketDataEvent):
+                if isinstance(event, MarketEvent):
                     event_timestamp = datetime.fromisoformat(event.timestamp)
                     event_day = event_timestamp.date() 
 
@@ -91,6 +79,7 @@ class EventController:
                     self.strategy.handle_market_data()
 
                 elif isinstance(event, SignalEvent):
+                    self.performance_manager.update_signals(event.signal)
                     self.order_manager.on_signal(event)
 
                 elif isinstance(event, OrderEvent):
@@ -104,33 +93,12 @@ class EventController:
             self.broker_client.eod_update()
 
         self.broker_client.liquidate_positions()
-        self.finalize_backtest()
-
-    def finalize_backtest(self):
         self.performance_manager.calculate_statistics()
-        # Collect data from components
-        price_log = self.data_client.price_log
+        self.performance_manager.create_backtest()
         
-        # Sort the list by timestamp
-        sorted_price_data = sorted(price_log, key=lambda x: x['timestamp'])
-        backtest_obj = self.performance_manager.create_backtest(sorted_price_data)
+        
+        
         # print(backtest_obj.to_dict())
         
         # Finalize and save to database
         # response = self.database.create_backtest(self.backtest.to_dict())
-        
-
-        # # Get the earliest and latest data
-        # self.parameters['start_date'] = sorted_price_data[0]['timestamp']
-        # self.parameters['end_date'] = sorted_price_data[-1]['timestamp']
-
-        # # # Create Backtest Object
-        # # self.backtest.set_parameters(self.parameters)
-        # # self.backtest.set_summary_stats(summary_stats)
-        # # self.backtest.set_trade_data(trade_log)
-        # # self.backtest.set_equity_data(equity_log)    
-        # # self.backtest.set_price_data(price_log)
-        # # self.backtest.set_signals(signal_log)
-
-
-            

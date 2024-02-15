@@ -1,9 +1,13 @@
 import logging
 from queue import Queue
-from midas.events import ExecutionEvent, OrderEvent
-from midas.order_book import OrderBook
-from midas.portfolio import PortfolioServer
+from datetime import datetime
+from ibapi.contract import Contract
+from ibapi.order import Order
+
 from .dummy_broker import DummyBroker
+from midas.portfolio import PortfolioServer
+from midas.account_data import Position, Trade
+from midas.events import ExecutionEvent, OrderEvent, TradeInstruction, Action
 
 class BrokerClient:
     """
@@ -18,7 +22,6 @@ class BrokerClient:
 
         self.update_account()
         
-
     def on_order(self, event: OrderEvent):
         """
         The Order Event listener, called when a new order event is intercepted in the queue.
@@ -35,7 +38,7 @@ class BrokerClient:
 
         self.handle_order(timestamp, trade_instructions,action ,contract,order)
 
-    def handle_order(self, timestamp, trade_instructions, action ,contract, order):
+    def handle_order(self, timestamp, trade_instructions:TradeInstruction, action:Action, contract:Contract, order:Order):
         """
         Handles the the execution of the order, simulation the placing of order and creation of execution event.
         
@@ -62,21 +65,45 @@ class BrokerClient:
     def update_positions(self):
         positions = self.broker.return_positions()
         for contract, position_data in positions.items():
-            self.portfolio_server.update_positions(contract, position_data)
+            # Convert the `PositionDetails` TypedDict into a `Position` data class instance.
+            position_instance = Position(
+                action=position_data['action'],
+                avg_cost=position_data['avg_cost'],
+                quantity=position_data['quantity'],
+                contract_size=position_data['contract_size'],
+                initial_margin=position_data['initial_margin'],
+                total_cost=position_data.get('total_cost', 0)  # Provide a default value if not present
+            )
 
-    def update_account(self):
-        account  = self.broker.return_account()
-        self.portfolio_server.update_account_details(account)
+            # Now, use `position_instance` as needed, for example, to update positions in the portfolio server.
+            self.portfolio_server.update_positions(contract, position_instance)
 
     def update_trades(self):
         last_trades = self.broker.return_ExecutedTrade()
-        for contract in last_trades:
-            self.portfolio_server.update_trades(**last_trades[contract])
-   
+        for contract, trade in last_trades.items():
+            # Convert the `ExecutiuonDetails` TypedDict into a `Trade` data class instance.
+            trade_instance = Trade(
+                trade_id= trade['trade_id'],
+                leg_id= trade['leg_id'],
+                timestamp= trade['timestamp'],
+                symbol= trade['symbol'],
+                quantity= trade['quantity'],
+                price= trade['price'],
+                cost= trade['cost'],
+                action= trade['action'],
+                fees= trade['fees']
+            )
+
+            self.portfolio_server.update_trades(trade_instance)
+
+    def update_account(self):
+        account = self.broker.return_account()
+        self.portfolio_server.update_account_details(account)
+
     def update_EquityValue(self):
         self.broker.update_equity_value()
-        account  = self.broker.return_account()
-        self.portfolio_server.update_account_details(account)
+        equity = self.broker.return_EquityValue()
+        self.portfolio_server.update_equity(equity)
         # self.portfolio_server.update_account_details({'EquityValue':{'timestamp': account['Timestamp'], 'equity_value':account['EquityValue']}})
 
 

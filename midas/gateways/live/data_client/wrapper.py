@@ -2,8 +2,8 @@ import os
 import threading
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
-from midas.events import MarketDataEvent
-from midas.market_data import BarData
+from midas.events import MarketEvent
+from zextra.market_data import BarData
 from queue import Queue
 import logging
 
@@ -75,7 +75,7 @@ class DataApp(EWrapper, EClient):
         self.current_bar_data[symbol] = new_bar_entry
         
         if len(self.current_bar_data) == len(self.reqId_to_symbol_map):
-            market_data_event = MarketDataEvent(self.current_bar_data)
+            market_data_event = MarketEvent(self.current_bar_data)
             self.event_queue.put(market_data_event)
             # Reset current bar data for the next bar
             self.current_bar_data = {}

@@ -1,19 +1,13 @@
-import os
 import queue
 from decouple import config
 from typing import Union
 from midas.symbols import Symbol
-from midas.market_data import MarketDataType
-from midas.orders import OrderManager
+from midas.order_manager import OrderManager
 from midas.strategies import BaseStrategy
 from midas.order_book import OrderBook
 from midas.portfolio import PortfolioServer, PerformanceManager
 from midas.tools import DatabaseClient
 from midas.utils.logger import SystemLogger
-from queue import Queue
-import pandas as pd
-from typing import List,Dict
-from dataclasses import dataclass, field, InitVar
 from .parameters import Parameters
 
 
@@ -24,38 +18,7 @@ class Mode:
     LIVE = "LIVE"
     BACKTEST = "BACKTEST"
 
-# @dataclass
-# class Parameters:
-#     strategy_name: str
-#     capital: int
-#     data_type: MarketDataType
-#     strategy_allocation: float = 1.0
-#     train_start: str = None
-#     train_end: str = None
-#     test_start: str = None
-#     test_end: str = None
-#     symbols: List[Symbol] = field(default_factory=list)
-#     # Derived attribute, not directly passed by the user
-#     tickers: List[str] = field(default_factory=list)
-
-#     def __post_init__(self):
-#         # Populate the tickers list based on the provided symbols
-#         self.tickers = [symbol.ticker for symbol in self.symbols]
-
-#     def to_dict(self):
-#         return {
-#             'strategy_name': self.strategy_name, 
-#             'capital': self.capital, 
-#             'data_type': self.data_type.value, 
-#             'strategy_allocation': self.strategy_allocation, 
-#             'train_start': self.train_start, 
-#             'train_end': self.train_end, 
-#             'test_start': self.test_start,
-#             'test_end': self.test_end,
-#             'tickers': self.tickers
-#         }
-
-class Config:
+class Config:   
     def __init__(self, mode: Mode, params: Parameters):
         self.mode = mode
         self.params = params
@@ -108,7 +71,7 @@ class Config:
 
     def initialize_components(self):
         self.order_book = OrderBook(data_type=self.params.data_type)
-        self.performance_manager = PerformanceManager(self.logger, self.params)
+        self.performance_manager = PerformanceManager(self.database,self.logger, self.params)
         self.portfolio_server = PortfolioServer(self.symbols_map, self.logger, self.performance_manager)
         self.order_manager = OrderManager(self.params.strategy_allocation, self.symbols_map, self.event_queue, self.order_book, self.portfolio_server, self.logger)
 
@@ -147,7 +110,7 @@ class Config:
             self.data_client.get_data(data_type=self.params.data_type, contract=symbol.contract) 
 
     def load_backtest_data(self):
-        self.data_client.get_data(self.symbols_map, self.params.test_start, self.params.test_end)
+        self.data_client.get_data(self.symbols_map, self.params.test_start, self.params.test_end,self.params.missing_values_strategy)
 
     def load_train_data(self):
         """
@@ -158,29 +121,26 @@ class Config:
             start_date (str) : Beginning date for the backtest ex. "2023-01-01"
             end_date (str) : End date for the backtest ex. "2024-01-01"
         """
-        symbols = list(self.symbols_map.keys())
-        response = self.database.get_price_data(symbols, self.params.train_start, self.params.train_end)
+        self.data_client.get_data(self.symbols_map, self.params.test_start, self.params.test_end,self.params.missing_values_strategy)
+        train_data = self.data_client.data
 
-        # Process the data
-        train_data = pd.DataFrame(response)
-
-        # Extract contract details for mapping
+        # # Extract contract details for mapping
         contracts_map = {symbol: self.symbols_map[symbol].contract for symbol in self.symbols_map}
         train_data['contract'] = train_data['symbol'].map(contracts_map)
 
-        # Convert the 'timestamp' column to datetime objects
-        train_data['timestamp'] = pd.to_datetime(train_data['timestamp'])
-
-        # Sorting the DataFrame by the 'timestamp' column in ascending order
+        # # Sorting the DataFrame by the 'timestamp' column in ascending order
         train_data = train_data.sort_values(by='timestamp', ascending=True).reset_index(drop=True)
-        train_data = train_data.pivot(index='timestamp', columns='symbol', values='close')
-        
-        for col in train_data:
-            train_data[col] = train_data[col].astype(float)
+        self.train_data = train_data.pivot(index='timestamp', columns='symbol', values='close')
+        # print(self.train_data)
 
-        self.train_data = train_data.ffill()
+        # print(train_data)
+        # # Convert the 'timestamp' column to datetime objects
+        # train_data['timestamp'] = pd.to_datetime(train_data['timestamp'])
+        # print(train_data)
+        # for col in train_data:
+        #     train_data[col] = train_data[col].astype(float)
 
     def set_strategy(self, strategy: Union[BaseStrategy, type]):
         if isinstance(strategy, type):
-            strategy = strategy(self.symbols_map,self.train_data,portfolio_server=self.portfolio_server, logger = self.logger,order_book = self.order_book,event_queue=self.event_queue, performance_manager=self.performance_manager)
+            strategy = strategy(self.symbols_map,self.train_data,portfolio_server=self.portfolio_server, logger = self.logger,order_book = self.order_book,event_queue=self.event_queue)
         self.strategy = strategy

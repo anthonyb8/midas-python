@@ -5,6 +5,7 @@ import threading
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
 from midas.portfolio import PortfolioServer
+from midas.account_data import ActiveOrder, Position, Account
 
 class BrokerApp(EWrapper, EClient):
     ACCOUNT_INFO_KEYS = {'AccruedCash', 'AvailableFunds', 'BuyingPower', 'CashBalance', 
@@ -104,23 +105,23 @@ class BrokerApp(EWrapper, EClient):
 
     def openOrder(self, orderId, contract, order, orderState):
         super().openOrder(orderId, contract, order, orderState)
-        data = {
-            "permId" : order.permId,
-            "clientId": order.clientId, 
-            "orderId": orderId, 
-            "account": order.account, 
-            "symbol": contract.symbol, 
-            "secType": contract.secType,
-            "exchange": contract.exchange, 
-            "action": order.action, 
-            "orderType": order.orderType,
-            "totalQty": order.totalQuantity, 
-            "cashQty": order.cashQty, 
-            "lmtPrice": order.lmtPrice, 
-            "auxPrice": order.auxPrice, 
-            "status": orderState.status
-        }
-        self.portfolio_server.update_orders(**data)
+        order_data = ActiveOrder(
+            permId= order.permId,
+            clientId= order.clientId, 
+            orderId= orderId, 
+            account= order.account, 
+            symbol= contract.symbol, 
+            secType= contract.secType,
+            exchange= contract.exchange, 
+            action= order.action, 
+            orderType= order.orderType,
+            totalQty= order.totalQuantity, 
+            cashQty= order.cashQty, 
+            lmtPrice= order.lmtPrice, 
+            auxPrice= order.auxPrice, 
+            status= orderState.status
+        )
+        self.portfolio_server.update_orders(order_data)
 
     # Wrapper function for openOrderEnd
     def openOrderEnd(self):

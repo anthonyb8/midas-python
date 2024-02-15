@@ -13,7 +13,7 @@ from midas.strategies import BaseStrategy
 from midas.symbols import Symbol
 from ibapi.contract import Contract
 from midas.order_book import OrderBook
-from midas.orders import OrderType, Action
+from midas.order_manager import OrderType, Action
 from midas.portfolio import PortfolioServer, PerformanceManager
 
 from research.backtesting import HTMLReportGenerator
@@ -97,11 +97,13 @@ class Cointegrationzscore(BaseStrategy):
         self.current_zscore = None
         
         # Establish histroccal values
+        print(len(self.historical_data))
         self.historic_spread(self.historical_data, self.cointegration_vector)
         self.historic_zscore()
+        print(len(self.historical_zscore))
 
     def prepare(self, train_data: pd.DataFrame):
-        train_data = adjust_to_business_time(train_data, frequency='daily')
+        # train_data = adjust_to_business_time(train_data, frequency='daily')
         self.historical_data = train_data
 
         # Run cointegration test
@@ -110,6 +112,7 @@ class Cointegrationzscore(BaseStrategy):
         # Establish histroccal values
         self.historic_spread(train_data, self.cointegration_vector)
         self.historic_zscore()
+        print(len(self.historical_zscore))
         
         # Create hedge ratio dictionary
         symbols = train_data.columns.tolist()

@@ -1,12 +1,13 @@
+import logging
 from typing import Dict
 from queue import Queue
 from ibapi.contract import Contract
-from midas.events import  SignalEvent, OrderEvent
+from ibapi.order import Order
+
+from midas.events import  SignalEvent, OrderEvent,  LimitOrder, MarketOrder, StopLoss, Action, OrderType, TradeInstruction
 from midas.order_book import OrderBook
 from midas.portfolio import PortfolioServer
-from .data import LimitOrder, MarketOrder, StopLoss, Action, OrderType
 from midas.symbols import Symbol, Future, Equity
-import logging
 
 class OrderManager:
     def __init__(self, strategy_allocation:float, symbols_map: Dict[str, Symbol], event_queue: Queue, order_book:OrderBook, portfolio_server: PortfolioServer, logger:logging.Logger):
@@ -33,7 +34,7 @@ class OrderManager:
 
         self.handle_signal(timestamp,trade_instructions)
 
-    def handle_signal(self, timestamp,trade_instructions):
+    def handle_signal(self, timestamp, trade_instructions:TradeInstruction):
         """
         Converts trade instructions into OrderEvents based on capital and positions.
 
@@ -91,7 +92,7 @@ class OrderManager:
         else:
             raise ValueError(f"OrderType not of valid type : {order_type}")
 
-    def equity_order_details(self, contract, action: Action, weight: float, current_capital: float, positions: dict):
+    def equity_order_details(self, contract:Contract, action: Action, weight: float, current_capital: float, positions: dict):
         """
         Create order details based on trade action and market data.
 
@@ -115,7 +116,7 @@ class OrderManager:
 
         return action, fill_price, quantity
     
-    def futures_order_details(self, trade_instruction, position_allocation):
+    def futures_order_details(self, trade_instruction:TradeInstruction, position_allocation:float):
         ticker = trade_instruction.ticker
         action = trade_instruction.action
         weight = trade_instruction.weight
@@ -147,30 +148,14 @@ class OrderManager:
         
         return order, margin_required
     
-    def set_order(self, timestamp, trade_instruction,action, contract, order):
+    def set_order(self, timestamp, trade_instruction: TradeInstruction, action: Action, contract: Contract, order: Order):
         """
         Create and queue an OrderEvent.
 
         Parameters:
             order_detail: Details of the order to be created and queued.
         """
-        order_event = OrderEvent(timestamp, trade_instruction, action, contract, order)
+        order_event = OrderEvent(timestamp, trade_instruction, contract, order)
         self._event_queue.put(order_event)
         
     
-    # def check_capital(self, current_capital: float, total_trade_value: float) -> bool:
-    #     """
-    #     Check if there is enough capital to execute the proposed trades.
-
-    #     Parameters:
-    #         current_capital (float): Current available capital.
-    #         total_trade_value (float): Total value of the proposed trades.
-
-    #     Returns:
-    #         bool: True if there is enough capital, False otherwise.
-    #     """
-    #     return current_capital >= total_trade_value
-    
-    # def get_contract(self, symbol: str) -> Contract:
-    #     """Retrieve contract for a given symbol."""
-    #     return self.symbols_map[symbol].contract

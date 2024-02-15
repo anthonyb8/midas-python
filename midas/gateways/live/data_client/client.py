@@ -5,7 +5,7 @@ from queue import Queue
 from .wrapper import DataApp
 import logging
 from ibapi.contract import Contract
-from midas.market_data import MarketDataType
+from midas.events import MarketDataType
 from decouple import config
 
 

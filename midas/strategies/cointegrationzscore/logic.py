@@ -7,14 +7,13 @@ import logging
 from enum import Enum, auto
 from pandas.tseries.offsets import CustomBusinessDay
 from pandas.tseries.holiday import USFederalHolidayCalendar
+from ibapi.contract import Contract
 
-from midas.signals import TradeInstruction
+from midas.events import TradeInstruction, OrderType, Action
 from midas.strategies import BaseStrategy
 from midas.symbols import Symbol
-from ibapi.contract import Contract
 from midas.order_book import OrderBook
-from midas.orders import OrderType, Action
-from midas.portfolio import PortfolioServer, PerformanceManager
+from midas.portfolio import PortfolioServer
 
 from research.backtesting import HTMLReportGenerator
 from research.data_analysis import DataProcessing, TimeseriesTests
@@ -68,8 +67,8 @@ class Signal(Enum):
     Exit_Undervalued = auto()
 
 class Cointegrationzscore(BaseStrategy):
-    def __init__(self, symbols_map:Dict[str, Symbol], train_data:pd.DataFrame,portfolio_server: PortfolioServer, logger:logging.Logger, order_book:OrderBook,event_queue:Queue, performance_manager:PerformanceManager):
-        super().__init__(performance_manager, order_book, event_queue)
+    def __init__(self, symbols_map:Dict[str, Symbol], train_data:pd.DataFrame,portfolio_server: PortfolioServer, logger:logging.Logger, order_book:OrderBook,event_queue:Queue):
+        super().__init__(order_book, event_queue)
         self.logger = logger
         self.portfolio_server = portfolio_server
         self.symbols_map = symbols_map
@@ -98,7 +97,7 @@ class Cointegrationzscore(BaseStrategy):
         self.historic_zscore()
 
     def prepare(self, train_data: pd.DataFrame, report_generator: HTMLReportGenerator=None):
-        train_data = adjust_to_business_time(train_data, frequency='daily')
+        # train_data = adjust_to_business_time(train_data, frequency='daily')
         self.historical_data = train_data
         cointegration_vector = self.cointegration(train_data, report_generator)
 
@@ -294,6 +293,7 @@ class Cointegrationzscore(BaseStrategy):
         trade_instructions = None
         # Get current_prices from order_book
         close_values = self.order_book.current_prices()
+        print(close_values)
         data = pd.DataFrame([close_values])
 
         # Update features

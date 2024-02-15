@@ -1,12 +1,17 @@
-from enum import Enum , auto
+from typing  import  Any
+from datetime import datetime
+from dataclasses import dataclass, field
+from enum import Enum 
 from ibapi.order import Order
+from ibapi.contract import Contract
+# from midas.events import TradeInstruction
 
 class Action(Enum):
     """ Long and short are treated as entry actions and short/cover are treated as exit actions. """
-    LONG = auto()  # BUY
-    COVER = auto() # BUY
-    SHORT = auto() # SELL
-    SELL = auto()  # SELL
+    LONG = 'LONG'  # BUY
+    COVER = 'COVER' # BUY
+    SHORT = 'SHORT' # SELL
+    SELL = 'SELL'  # SELL
 
     def to_broker_standard(self):
         """Converts the enum to the standard BUY or SELL action for the broker."""
@@ -69,3 +74,19 @@ class StopLoss(BaseOrder):
         
         super().__init__(action, quantity, OrderType.STOPLOSS)
         self.order.auxPrice = aux_price
+
+@dataclass
+class OrderEvent:
+    timestamp: Any  # Use the appropriate type, e.g., datetime or str
+    trade_instructions: Any 
+    # direction: Optional[str] = None  # Uncomment and adjust the type as necessary
+    contract: Contract 
+    order: Order  
+    type: str = field(init=False, default='ORDER')
+
+    def __str__(self) -> str:
+        # Assuming trade_instructions and order have a __dict__ or similar method to convert to a dictionary
+        # If not, you might need to adjust how you represent these objects as strings
+        string = f"\n{self.type} : \n Timestamp: {self.timestamp}\n Trade Instructions: {self.trade_instructions.__dict__}\n Contract: {self.contract}\n Order: {self.order.__dict__}\n"
+        return string
+    
