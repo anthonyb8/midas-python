@@ -12,9 +12,12 @@ class ContractManager:
 
     def validate_contract(self, contract: Contract) -> bool:
         """Validate a contract with IB."""
+
+        if not isinstance(contract, Contract):
+            raise ValueError("'contract' must be of type Contract instance.")
         
         # Check if the contract is already validated
-        if self.is_contract_validated(contract):
+        if self._is_contract_validated(contract):
             self.logger.info(f"Contract {contract.symbol} is already validated.")
             return True
 
@@ -36,6 +39,6 @@ class ContractManager:
             
         return self.app.is_valid_contract
 
-    def is_contract_validated(self, contract: Contract) -> bool:
+    def _is_contract_validated(self, contract: Contract) -> bool:
         """Check if a contract has already been validated."""
         return contract.symbol in self.validated_contracts

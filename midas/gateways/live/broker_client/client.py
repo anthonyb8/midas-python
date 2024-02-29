@@ -1,20 +1,24 @@
 # client.py
 import logging
 import threading
-from .wrapper import BrokerApp
 from queue import Queue  
+from decouple import config
+from ibapi.order import Order
+from ibapi.contract import Contract
+
+from .wrapper import BrokerApp
 from midas.events import OrderEvent
 from midas.portfolio import PortfolioServer
-from decouple import config
+from midas.performance import PerformanceManager
 
 
 class BrokerClient():
 
-    def __init__(self, event_queue: Queue, logger:logging.Logger,portfolio_server: PortfolioServer, host=config('HOST'), port=config('PORT'), clientId=config('TRADE_CLIENT_ID'), ib_account =config('IB_ACCOUNT')):
+    def __init__(self, event_queue: Queue, logger:logging.Logger, portfolio_server: PortfolioServer, performance_manager: PerformanceManager, host=config('HOST'), port=config('PORT'), clientId=config('TRADE_CLIENT_ID'), ib_account =config('IB_ACCOUNT')):
         self.logger = logger
         self.event_queue = event_queue
         
-        self.app = BrokerApp(logger, portfolio_server)
+        self.app = BrokerApp(logger, portfolio_server, performance_manager)
         self.host = host
         self.port = int(port)
         self.clientId = clientId
@@ -67,18 +71,18 @@ class BrokerClient():
         return self.app.isConnected()
     
     # -- Orders --
-
     def on_order(self, event: OrderEvent):
-        # Convert order to execution here
+        if not isinstance(event,OrderEvent):
+            raise ValueError("'event' must be of type OrderEvent instance.")
+        
         contract = event.contract
         order = event.order
         self.handle_order(contract,order) 
 
-    def handle_order(self, contract, order):
+    def handle_order(self, contract:Contract, order:Order):
         orderId = self._get_valid_id()
         try:
             self.app.placeOrder(orderId=orderId, contract=contract, order=order)
-
         except Exception as e:
             raise e
 

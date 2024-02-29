@@ -1,37 +1,30 @@
-from typing  import  Dict, Any
+from typing  import  Dict, Any, Union
 from datetime import datetime
 from dataclasses import dataclass, field
-from midas.events import TradeInstruction, Action
 from ibapi.contract import Contract
-from ibapi.order import Order
 
-@dataclass
-class Trade:
-    trade_id: str
-    leg_id: str
-    timestamp: datetime
-    symbol: str
-    quantity: int
-    price: float
-    cost: float
-    action: str
-    fees: float
-
-    def __post_init__(self):
-        if isinstance(self.timestamp, datetime):
-            self.timestamp = self.timestamp.isoformat()
+from midas.events import Action
+from midas.account_data import Trade
 
 @dataclass
 class ExecutionEvent:
-    timestamp: Any  # Replace Any with the appropriate type, e.g., datetime or str
-    trade_instructions: TradeInstruction 
+    timestamp: Union[int, float]
+    trade_details: Trade
     action: Action 
     contract: Contract
-    order: Order
-    trade_details: Trade
     type: str = field(init=False, default='EXECUTION')
 
+    def __post_init__(self):
+        # Type Check
+        if not isinstance(self.timestamp, (float,int)):
+            raise TypeError(f"'timestamp' should be in UNIX format of type float or int, got {type(self.timestamp).__name__}")
+        if not isinstance(self.action, Action):
+            raise TypeError("'action' must be of type Action enum.")
+        if not isinstance(self.trade_details, Trade):
+            raise TypeError("'trade_details' must be of type Trade instance.")
+        if not isinstance(self.contract, Contract):
+            raise TypeError("'contract' must be of type Contract instance.")
+
     def __str__(self) -> str:
-        # Modify string representation according to actual attributes' structure
         string = f"\n{self.type} : \n Timestamp: {self.timestamp}\n Trade Instructions: {self.trade_instructions.__dict__}\n Contract: {self.contract}\n Order: {self.order.__dict__}\n Execution Details: {self.trade_details}\n"
         return string

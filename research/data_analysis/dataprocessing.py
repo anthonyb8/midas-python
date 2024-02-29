@@ -1,5 +1,5 @@
-import os
-os.chdir('/Users/anthony/git-projects/midas')
+# import os
+# os.chdir('/Users/anthony/git-projects/midas')
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
 from scipy.optimize import curve_fit
 
-from midas.tools import DatabaseClient
+from midas.utils.database import DatabaseClient
 
 pd.set_option('display.max_colwidth', None)
 pd.set_option('display.max_columns', 100)

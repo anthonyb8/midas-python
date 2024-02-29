@@ -67,10 +67,10 @@ class Signal(Enum):
     Exit_Undervalued = auto()
 
 class Cointegrationzscore(BaseStrategy):
-    def __init__(self, symbols_map:Dict[str, Symbol], train_data:pd.DataFrame,portfolio_server: PortfolioServer, logger:logging.Logger, order_book:OrderBook,event_queue:Queue):
-        super().__init__(order_book, event_queue)
-        self.logger = logger
-        self.portfolio_server = portfolio_server
+    def __init__(self, symbols_map:Dict[str, Symbol], train_data:pd.DataFrame, portfolio_server: PortfolioServer, logger:logging.Logger, order_book:OrderBook,event_queue:Queue):
+        super().__init__(portfolio_server,order_book, logger,event_queue)
+        # self.logger = logger
+        # self.portfolio_server = portfolio_server
         self.symbols_map = symbols_map
         self.trade_id = 1
         
@@ -234,6 +234,7 @@ class Cointegrationzscore(BaseStrategy):
 
         # Create a dictionary of symbols and corresponding normalized hedge ratios
         self.hedge_ratio = {symbol: ratio for symbol, ratio in zip(symbols, normalized_cointegration_vector)}
+        self.logger.info(self.hedge_ratio)
 
     def entry_signal(self, z_score: float, entry_threshold: float):
         if not any(ticker in self.portfolio_server.positions for ticker in self.symbols_map.keys()):
@@ -289,11 +290,10 @@ class Cointegrationzscore(BaseStrategy):
             
         return trade_instructions 
     
-    def handle_market_data(self,data= None,entry_threshold: float=0.5, exit_threshold: float=0.0):
+    def handle_market_data(self, data= None, entry_threshold: float=0.5, exit_threshold: float=0.0):
         trade_instructions = None
         # Get current_prices from order_book
         close_values = self.order_book.current_prices()
-        print(close_values)
         data = pd.DataFrame([close_values])
 
         # Update features

@@ -1,11 +1,13 @@
-from midas.events import BarData,TickData, MarketDataType, MarketEvent, MarketData
+from midas.events import BarData, QuoteData, MarketDataType, MarketEvent, MarketData
 from typing import Dict, Union
 from datetime import datetime
 
 class OrderBook:
     def __init__(self, data_type:MarketDataType):
-        # Each ticker will now have an additional 'last_updated' key to store the timestamp
-        self.book : Dict[str,Union[BarData, TickData]] = {} # Example: {ticker : {'data': {Ask:{}, Bid:{}}, 'last_updated': timestamp}, ...}
+        if not isinstance(data_type, MarketDataType):
+            raise TypeError("'data_type' must be of type MarketDataType enum.")
+
+        self.book : Dict[str,Union[BarData, QuoteData]] = {} # Example: {ticker : {'data': {Ask:{}, Bid:{}}, 'last_updated': timestamp}, ...}
         self.last_updated = None
         self.data_type = data_type
 
@@ -16,11 +18,14 @@ class OrderBook:
         Parameters:
             event (MarketDataEvent): The market data event to handle.
         """
+        if not isinstance(event,MarketEvent):
+            raise TypeError("'event' must be an instance MarketEvent.")
+        
         timestamp = event.timestamp
         data = event.data
-        self.handle_market_data(data, timestamp)
+        self._handle_market_data(data, timestamp)
 
-    def handle_market_data(self, data: Union[BarData, TickData], timestamp: str):
+    def _handle_market_data(self, data: Dict[str, Union[BarData, QuoteData]], timestamp: int):
         """
         Process market data and generate trading signals.
 
@@ -28,12 +33,15 @@ class OrderBook:
             data (Dict): The market data.
             timestamp (str): The timestamp of the data.
         """
-        for ticker in data:
-            self.insert(ticker, data[ticker], timestamp)
+        for ticker, market_data in data.items():
+            if isinstance(market_data, BarData):
+                self._insert_bar(ticker, market_data)
+            elif isinstance(market_data, QuoteData):
+                self._insert_or_update_quote(ticker, market_data, timestamp)
 
         self.last_updated = timestamp
-        
-    def insert(self, ticker, data: MarketData, timestamp: str):
+
+    def _insert_bar(self, ticker: str, data: MarketData):
         """
         Insert or update the data for a ticker along with the timestamp.
 
@@ -42,18 +50,19 @@ class OrderBook:
             data (dict): The data to be stored for the ticker.
             timestamp (str): The timestamp when the data was received.
         """
-        # Update or add the ticker data along with the last updated timestamp
+        # Directly insert or update BarData
         self.book[ticker] = data
+
+    def _insert_or_update_quote(self, ticker: str, quote_data: QuoteData, timestamp: int):
+        self.book[ticker] = quote_data  # For keeping only the most recent quote:
 
     def current_price(self, ticker: str):
         if ticker in self.book:
             data = self.book[ticker]
             if self.data_type.value == MarketDataType.BAR.value:
-                # Assuming 'Close' price is relevant for BAR data
-                return data.CLOSE
-            elif self.data_type.value == MarketDataType.TICK.value:
-                # Assuming 'Last' price is relevant for TICK data, or choose another relevant key
-                return data.Last
+                return data.close # returns close as it is most recent
+            elif self.data_type.value == MarketDataType.QUOTE.value: 
+                return (data.ask + data.bid) / 2 # returns a mid-price
         else:
             return None  # Ticker not found
 
@@ -61,15 +70,15 @@ class OrderBook:
         prices = {}
         for key, data in self.book.items():
             if self.data_type.value == MarketDataType.BAR.value:
-                prices[key] = data.CLOSE
-            elif self.data_type.value == MarketDataType.TICK.value:
-                prices[key] = data.Last
+                prices[key] = data.close
+            elif self.data_type.value == MarketDataType.QUOTE.value:
+                prices[key] = (data.ask + data.bid) / 2 
         return prices
         
-    def modify(self):
+    def _modify(self):
         # Changing an old bar or order in the book
         pass
-    def cancellation(self):
+    def _cancellation(self):
         pass
         # remove a cancelled order from the book
     def retrieval(self):

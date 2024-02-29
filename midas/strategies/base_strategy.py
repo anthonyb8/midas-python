@@ -1,8 +1,12 @@
-from typing import List
+import logging
+from typing import List, Union
 from abc import ABC, abstractmethod
 from queue import Queue
-from midas.events import  SignalEvent, MarketEvent, Signal, TradeInstruction
+
+from midas.events import  SignalEvent, MarketEvent, TradeInstruction
 from midas.order_book import OrderBook
+from midas.portfolio import PortfolioServer
+
 
 class BaseStrategy(ABC):
     """
@@ -12,7 +16,7 @@ class BaseStrategy(ABC):
     handling market data, generating signals, and managing orders.
     """
 
-    def __init__(self, order_book: OrderBook, event_queue: Queue):
+    def __init__(self, portfolio_server: PortfolioServer, order_book: OrderBook, logger:logging.Logger, event_queue: Queue):
         """
         Initialize the strategy with necessary parameters and components.
 
@@ -20,36 +24,35 @@ class BaseStrategy(ABC):
             symbols_map (Dict[str, Contract]): Mapping of symbol strings to Contract objects.
             event_queue (Queue): Event queue for sending events to other parts of the system.
         """
+        # if not isinstance(order_book, OrderBook):
+        #     raise TypeError("'order_book' must be of type OrderBook instance.")
+        # if not isinstance(event_queue, Queue):
+        #     raise TypeError("'event_queue' must be of type Queue instance.")
+        
         self._event_queue = event_queue 
         self.order_book = order_book
-        
+        self.logger = logger
+        self.portfolio_server = portfolio_server
         self.trade_id = 1
-        self.current_position = None
     
     def on_market_data(self, event: MarketEvent):
         """
-        Handle new market data events.
+        Handle new market events.
 
         Parameters:
-            event (MarketDataEvent): The market data event to handle.
+            event (MarketEvent): The market event to handle.
         """
-        timestamp = event.timestamp
-        data = event.data
+        if not isinstance(event, MarketEvent):
+            raise TypeError("'event' must be of type Market Event instance.")
 
         self.handle_market_data()
 
     @abstractmethod
     def handle_market_data(self):
-        """
-        Process market data and generate trading signals.
-
-        Parameters:
-            data (Dict): The market data.
-            timestamp (str): The timestamp of the data.
-        """
+        """ Process market data and generate trading signals. """
         pass
 
-    def set_signal(self, trade_instructions:List[TradeInstruction], timestamp):
+    def set_signal(self, trade_instructions:List[TradeInstruction], trade_capital: Union[int, float], timestamp: Union[int, float]):
         """
         Create and queue signal events based on trading instructions.
 
@@ -58,8 +61,13 @@ class BaseStrategy(ABC):
             market_data: Market data associated with the signals.
             timestamp: Timestamp for the signals.
         """
-        signal = Signal(timestamp, trade_instructions)
-        self._event_queue.put(SignalEvent(signal))
+        try:
+            signal_event = SignalEvent(timestamp, trade_capital, trade_instructions)
+            self._event_queue.put(signal_event)
+        except (ValueError, TypeError) as e:
+            raise RuntimeError(f"Failed to create or queue SignalEvent due to input error: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"Unexpected error when creating or queuing SignalEvent: {e}") from e
 
     @abstractmethod
     def entry_signal(self):

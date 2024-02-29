@@ -51,51 +51,58 @@ class DataClient:
         return self.app.isConnected()
     
     # -- Data --
-    def stream_market_data_top_book(self, contract:Contract):
-        reqId = self._get_valid_id()
-        
-        self.app.reqId_to_symbol_map[reqId] = contract.symbol
-
-        self.app.reqMktData(reqId=reqId, contract=contract,genericTickList="", snapshot=False, regulatorySnapshot=False, mktDataOptions=[])
-        if reqId not in self.app.market_data_top_book :
-            self.app.market_data_top_book[reqId] = {}
-        self.app.market_data_top_book[reqId]['CONTRACT'] = contract
-
-        self.logger.info(f"Requested top of book tick data stream for {contract}.")
-        
-    def cancel_market_data_stream(self,contract:Contract):
-        for key, value in self.app.market_data_top_book.items():
-            if value['CONTRACT'] == contract:
-                self.app.cancelMktData(reqId=key)
-                remove_key = key
-        del self.app.market_data_top_book[key]
-        
-    def cancel_all_market_data(self):
-        for reqId in self.app.market_data_top_book.keys():  
-            self.app.cancelMktData(reqId)
-        self.app.market_data_top_book.clear()
-
-    def get_top_book_market_data(self):
-        return self.app.market_data_top_book
+    def get_data(self, data_type:MarketDataType, contract:Contract):
+        if data_type == MarketDataType.QUOTE:
+            self.stream_quote_data(contract)
+        elif data_type == MarketDataType.BAR:
+            self.stream_5_sec_bars(contract)
+        else:
+            raise ValueError(f"'data_type' must be of type MarketDataType enum.")
 
     def stream_5_sec_bars(self, contract:Contract):
         reqId = self._get_valid_id()
 
-        self.app.reqId_to_symbol_map[reqId] = contract.symbol
+        # TODO: may not need the reqId check 
+        if reqId not in self.app.reqId_to_symbol_map.keys() and contract.symbol not in self.app.reqId_to_symbol_map.values():
+            self.app.reqRealTimeBars(reqId=reqId, contract=contract, barSize=5, whatToShow='TRADES', useRTH=False, realTimeBarsOptions=[])
+            self.app.reqId_to_symbol_map[reqId] = contract.symbol
+            self.logger.info(f"Started 5 sec bar data stream for {contract}.")
         
-        self.app.reqRealTimeBars(reqId=reqId, contract=contract, barSize=5, whatToShow='TRADES', useRTH=False, realTimeBarsOptions=[])
-        self.logger.info(f"Started 5 sec bar data stream for {contract}.")
+        self.logger.error(f"Data stream already established for {contract}.")
 
-    # def cancel_real_time_bars(self):
-    #     self.app.cancelRealTimeBars(self, tickerId:int)
+    def cancel_all_bar_data(self):
+        # Cancel real time bars for all reqId ** May not all be on bar data ** 
+        for reqId in self.app.reqId_to_symbol_map.keys():
+            self.app.cancelRealTimeBars(reqId)
+        self.app.reqId_to_symbol_map.clear()
+        
+    def stream_quote_data(self, contract:Contract):
+        reqId = self._get_valid_id()
+        
+        if reqId not in self.app.reqId_to_symbol_map.keys() and contract.symbol not in self.app.reqId_to_symbol_map.values():
+            self.app.reqMktData(reqId=reqId, contract=contract,genericTickList="", snapshot=False, regulatorySnapshot=False, mktDataOptions=[])
+            self.app.reqId_to_symbol_map[reqId] = contract.symbol
+            self.logger.info(f"Requested top of book tick data stream for {contract}.")
+        
+        self.logger.error(f"Data stream already established for {contract}.")
 
-    def get_data(self, data_type:MarketDataType, contract:Contract):
-        if data_type == MarketDataType.TICK:
-            self.stream_market_data_top_book(contract)
-        elif data_type == MarketDataType.BAR:
-            self.stream_5_sec_bars(contract)
-        else:
-            raise ValueError(f"{data_type} not a valid market data type. (TICK or BAR)")
+    def cancel_all_quote_data(self):
+        # Cancel real tiem bars for all reqId ** May not all be on bar data ** 
+        for reqId in self.app.reqId_to_symbol_map.keys():
+            self.app.cancelMktData(reqId)
+        
+        self.app.reqId_to_symbol_map.clear()
+
+    # def cancel_market_data_stream(self,contract:Contract):
+    #     for key, value in self.app.market_data_top_book.items():
+    #         if value['CONTRACT'] == contract:
+    #             self.app.cancelMktData(reqId=key)
+    #             remove_key = key
+    #     del self.app.market_data_top_book[key]
+        
+    # def get_top_book_market_data(self):
+    #     return self.app.market_data_top_book
+
 
 
 

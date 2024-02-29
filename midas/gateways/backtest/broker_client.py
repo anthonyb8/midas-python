@@ -6,15 +6,17 @@ from ibapi.order import Order
 
 from .dummy_broker import DummyBroker
 from midas.portfolio import PortfolioServer
-from midas.account_data import Position, Trade
+from midas.account_data import Position
 from midas.events import ExecutionEvent, OrderEvent, TradeInstruction, Action
+from midas.performance import PerformanceManager
 
 class BrokerClient:
     """
     Simulates the broker, controls the execution of trades and the updating of 'account' data.
     """
-    def __init__(self,event_queue: Queue, logger: logging.Logger, portfolio_server: PortfolioServer, broker:DummyBroker):
+    def __init__(self,event_queue: Queue, logger: logging.Logger, portfolio_server: PortfolioServer, performance_manager: PerformanceManager, broker:DummyBroker):
         # Subscriptions
+        self.performance_manager = performance_manager
         self.portfolio_server = portfolio_server
         self.broker = broker
         self.logger = logger
@@ -30,15 +32,19 @@ class BrokerClient:
             OrderEvent (Object) : Event with all the data related to a specific order to be executed.
 
         """
+        if not isinstance(event,OrderEvent):
+            raise ValueError("'event' must be of type OrderEvent instance.")
+        
         timestamp = event.timestamp
-        trade_instructions = event.trade_instructions
+        trade_id = event.trade_id
+        leg_id = event.leg_id
+        action = event.action
         contract = event.contract
         order = event.order
-        action= event.trade_instructions.action
 
-        self.handle_order(timestamp, trade_instructions,action ,contract,order)
+        self.handle_order(timestamp, trade_id, leg_id,action ,contract,order)
 
-    def handle_order(self, timestamp, trade_instructions:TradeInstruction, action:Action, contract:Contract, order:Order):
+    def handle_order(self, timestamp: int, trade_id: int, leg_id: int, action:Action, contract:Contract, order:Order):
         """
         Handles the the execution of the order, simulation the placing of order and creation of execution event.
         
@@ -49,18 +55,24 @@ class BrokerClient:
             market_data (Object) : Initial MarketDataEvent, used to pass data not included in the signal or order to the trade client for portfolio updating.
 
         """
+        self.broker.placeOrder(timestamp, trade_id, leg_id, action ,contract, order)
 
-        self.broker.placeOrder(timestamp, trade_instructions, action ,contract, order)
-
-    def on_execution(self, event:ExecutionEvent):
+    def on_execution(self, event: ExecutionEvent):
+        if not isinstance(event,ExecutionEvent):
+            raise ValueError("'event' must be of type ExecutionEvent instance.")
+        
+        ticker = event.contract.symbol
+        
         self.update_positions()
         self.update_account()
-        self.update_trades()
+        self.update_equity_value()
+        self.update_trades(ticker)
   
     def eod_update(self):
         self.broker.mark_to_market()
         self.broker.check_margin_call()
         self.update_account()
+        self.update_equity_value()
    
     def update_positions(self):
         positions = self.broker.return_positions()
@@ -70,49 +82,40 @@ class BrokerClient:
                 action=position_data['action'],
                 avg_cost=position_data['avg_cost'],
                 quantity=position_data['quantity'],
-                contract_size=position_data['contract_size'],
+                multiplier=position_data['multiplier'],
                 initial_margin=position_data['initial_margin'],
-                total_cost=position_data.get('total_cost', 0)  # Provide a default value if not present
+                total_cost=position_data.get('total_cost', 0),
+                market_value=position_data.get('market_value', 0),   # Provide a default value if not present
             )
 
             # Now, use `position_instance` as needed, for example, to update positions in the portfolio server.
             self.portfolio_server.update_positions(contract, position_instance)
 
-    def update_trades(self):
-        last_trades = self.broker.return_ExecutedTrade()
-        for contract, trade in last_trades.items():
-            # Convert the `ExecutiuonDetails` TypedDict into a `Trade` data class instance.
-            trade_instance = Trade(
-                trade_id= trade['trade_id'],
-                leg_id= trade['leg_id'],
-                timestamp= trade['timestamp'],
-                symbol= trade['symbol'],
-                quantity= trade['quantity'],
-                price= trade['price'],
-                cost= trade['cost'],
-                action= trade['action'],
-                fees= trade['fees']
-            )
+    def update_trades(self, ticker:str = None):
+        if ticker:
+            trade = self.broker.return_executed_trades(ticker)
+            self.performance_manager.update_trades(trade)
+        else: 
+            last_trades = self.broker.return_executed_trades(ticker)
 
-            self.portfolio_server.update_trades(trade_instance)
+            for contract, trade in last_trades.items():
+                self.performance_manager.update_trades(trade)
 
     def update_account(self):
         account = self.broker.return_account()
         self.portfolio_server.update_account_details(account)
 
-    def update_EquityValue(self):
-        self.broker.update_equity_value()
-        equity = self.broker.return_EquityValue()
-        self.portfolio_server.update_equity(equity)
-        # self.portfolio_server.update_account_details({'EquityValue':{'timestamp': account['Timestamp'], 'equity_value':account['EquityValue']}})
-
-
+    def update_equity_value(self):
+        self.broker._update_account_equity_value()
+        equity = self.broker.return_equity_value()
+        self.performance_manager.update_equity(equity)
+       
     def liquidate_positions(self):
         """
         Handles the liquidation of positions, typically on the last marketdataevent, to get allow for full performance calculations.
         """
         self.update_positions()
         self.update_account()
-        self.update_EquityValue()
+        self.update_equity_value()
         self.broker.liquidate_positions()
         self.update_trades()
