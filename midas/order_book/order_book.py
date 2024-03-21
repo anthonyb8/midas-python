@@ -1,6 +1,7 @@
-from midas.events import BarData, QuoteData, MarketDataType, MarketEvent, MarketData
 from typing import Dict, Union
-from datetime import datetime
+
+from midas.events import BarData, QuoteData, MarketDataType, MarketEvent, MarketData
+
 
 class OrderBook:
     def __init__(self, data_type:MarketDataType):

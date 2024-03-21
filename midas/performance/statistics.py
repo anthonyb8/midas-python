@@ -1,9 +1,46 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Union
-    
+
+
 class PerformanceStatistics:
+    @staticmethod
+    def validate_trade_log(trade_log: pd.DataFrame):
+        # Expected columns and their data types
+        expected_columns = {
+            'trade_id': 'int64',
+            'start_date': 'object',  # Could enforce datetime dtype after initial check
+            'end_date': 'object',    # Could enforce datetime dtype after initial check
+            'entry_value': 'float64',
+            'exit_value': 'float64',
+            'fees': 'float64',
+            'pnl': 'float64',
+            'gain/loss': 'float64'
+        }
+        
+        # Check if the input is a pandas DataFrame
+        if not isinstance(trade_log, pd.DataFrame):
+            raise TypeError("trade_log must be a pandas DataFrame")
+        
+        # Check for the presence of all expected columns
+        missing_columns = [col for col in expected_columns if col not in trade_log.columns]
+        if missing_columns:
+            raise ValueError(f"Missing columns in trade_log DataFrame: {missing_columns}")
+        
+        # Check data types of columns
+        for column, expected_dtype in expected_columns.items():
+            if trade_log[column].dtype != expected_dtype:
+                # Attempt to convert column types if not matching
+                try:
+                    if expected_dtype == 'object' and column in ['start_date', 'end_date']:
+                        trade_log[column] = pd.to_datetime(trade_log[column])
+                    else:
+                        trade_log[column] = trade_log[column].astype(expected_dtype)
+                except Exception as e:
+                    raise ValueError(f"Error converting {column} to {expected_dtype}: {e}")
+        
+        return True
+    
     # -- General -- 
     @staticmethod
     def net_profit(trade_log: pd.DataFrame):
@@ -11,20 +48,34 @@ class PerformanceStatistics:
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         
         # Perform calculation if checks pass
-        return round(trade_log['net_gain/loss'].sum(), 4)
+        return round(trade_log['pnl'].sum(), 4)
     
     @staticmethod
     def daily_return(equity_curve: np.ndarray):
-        """Returns are in decimal format."""
+        """
+        Calculate daily returns from an equity curve.
+        
+        This function assumes the input equity curve represents daily closing values 
+        at consistent daily intervals. It calculates the percentage change in value 
+        from one day to the next, returning these daily returns in decimal format.
+        
+        Parameters:
+        - equity_curve (np.ndarray): An array of daily closing equity values. 
+        The equity curve should be preprocessed to ensure it represents 
+        values at consistent daily intervals before being passed to this function.
+        
+        Returns:
+        - np.ndarray: An array of daily returns in decimal format.
+        """
         if not isinstance(equity_curve, np.ndarray):
             raise TypeError("equity_curve must be a numpy array")
         
@@ -91,7 +142,7 @@ class PerformanceStatistics:
 
     # -- Trades -- 
     @staticmethod
-    def total_trades(trade_log:pd.DataFrame):
+    def total_trades(trade_log: pd.DataFrame):
         return len(trade_log)
     
     @staticmethod
@@ -100,15 +151,15 @@ class PerformanceStatistics:
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         else:
-            return len(trade_log[trade_log['net_gain/loss'] > 0])
+            return len(trade_log[trade_log['pnl'] > 0])
     
     @staticmethod
     def total_losing_trades(trade_log:pd.DataFrame):
@@ -116,84 +167,88 @@ class PerformanceStatistics:
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         else:
-            return len(trade_log[trade_log['net_gain/loss'] < 0])
+            return len(trade_log[trade_log['pnl'] < 0])
     
     @staticmethod
-    def avg_win_percent(trade_log:pd.DataFrame):
+    def avg_win_return_rate(trade_log:pd.DataFrame):
+        """Returned value is in decimal format. """
         # Check if the input is a pandas DataFrame
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         else:
-            winning_trades = round(trade_log[trade_log['net_gain/loss'] > 0], 4)
-            return np.around(winning_trades['gain/loss (%)'].mean(),decimals=4) if not winning_trades.empty else 0
+            winning_trades = round(trade_log[trade_log['pnl'] > 0], 4)
+            return np.around(winning_trades['gain/loss'].mean(),decimals=4) if not winning_trades.empty else 0
 
     @staticmethod
-    def avg_loss_percent(trade_log:pd.DataFrame):
+    def avg_loss_return_rate(trade_log:pd.DataFrame):
+        """Returned value is in decimal format. """
         # Check if the input is a pandas DataFrame
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         else:
-            losing_trades = round(trade_log[trade_log['net_gain/loss'] < 0],4)
-            return np.around(losing_trades['gain/loss (%)'].mean(),decimals=4) if not losing_trades.empty else 0
+            losing_trades = round(trade_log[trade_log['pnl'] < 0],4)
+            return np.around(losing_trades['gain/loss'].mean(),decimals=4) if not losing_trades.empty else 0
     
     @staticmethod
-    def percent_profitable(trade_log:pd.DataFrame):
+    def profitability_ratio(trade_log: pd.DataFrame):
+        """Values returned as decimal format."""
         # Check if the input is a pandas DataFrame
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
-            return 0
+            return 0.0
         else:
             total_winning_trades = PerformanceStatistics.total_winning_trades(trade_log)
             total_trades = len(trade_log)
-            return round((total_winning_trades / total_trades) * 100, 2) if total_trades > 0 else 0.0
+            return round(total_winning_trades / total_trades, 4) if total_trades > 0 else 0.0
     
     @staticmethod
-    def average_trade_profit(trade_log:pd.DataFrame):
+    def avg_trade_profit(trade_log:pd.DataFrame):
+        """Values returned in dollars. """
         # Check if the input is a pandas DataFrame
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         else:
             net_profit = PerformanceStatistics.net_profit(trade_log)
-            total_trades = PerformanceStatistics.total_trades(trade_log)
+            total_trades = len(trade_log)
             return round(net_profit / total_trades,4) if total_trades > 0 else 0
     
     @staticmethod
@@ -203,16 +258,16 @@ class PerformanceStatistics:
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
 
-        gross_profits = trade_log[trade_log['net_gain/loss'] > 0]['net_gain/loss'].sum()
-        gross_losses = abs(trade_log[trade_log['net_gain/loss'] < 0]['net_gain/loss'].sum())
+        gross_profits = trade_log[trade_log['pnl'] > 0]['pnl'].sum()
+        gross_losses = abs(trade_log[trade_log['pnl'] < 0]['pnl'].sum())
         
         if gross_losses > 0:
             return round(gross_profits / gross_losses,4)
@@ -226,20 +281,20 @@ class PerformanceStatistics:
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'pnl' column exists in the DataFrame
+        if 'pnl' not in trade_log.columns:
+            raise ValueError("'pnl' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
 
         # Calculate average win
-        avg_win = trade_log[trade_log['net_gain/loss'] > 0]['net_gain/loss'].mean()
+        avg_win = trade_log[trade_log['pnl'] > 0]['pnl'].mean()
         avg_win = 0 if pd.isna(avg_win) else avg_win
         
         # Calculate average loss
-        avg_loss = trade_log[trade_log['net_gain/loss'] < 0]['net_gain/loss'].mean()
+        avg_loss = trade_log[trade_log['pnl'] < 0]['pnl'].mean()
         avg_loss = 0 if pd.isna(avg_loss) else avg_loss
 
         if avg_loss != 0:
@@ -267,16 +322,16 @@ class PerformanceStatistics:
         if not isinstance(trade_log, pd.DataFrame):
             raise TypeError("trade_log must be a pandas DataFrame")
         
-        # Check if the 'net_gain/loss' column exists in the DataFrame
-        if 'net_gain/loss' not in trade_log.columns:
-            raise ValueError("'net_gain/loss' column is missing in trade_log DataFrame")
+        # Check if the 'gain/loss' column exists in the DataFrame
+        if 'gain/loss' not in trade_log.columns:
+            raise ValueError("'gain/loss' column is missing in trade_log DataFrame")
         
         # Check for empty DataFrame
         if trade_log.empty:
             return 0
         
-        negative_returns = trade_log[trade_log['gain/loss (%)'] < target_return]['gain/loss (%)']
-        expected_return = trade_log['gain/loss (%)'].mean() - target_return
+        negative_returns = trade_log[trade_log['gain/loss'] < target_return]['gain/loss']
+        expected_return = trade_log['gain/loss'].mean() - target_return
         downside_deviation = negative_returns.std(ddof=1)
         
         if downside_deviation > 0:
@@ -347,5 +402,107 @@ class PerformanceStatistics:
         plt.axhline(y=0, color='gray', linestyle='--')
         plt.grid()
         plt.legend()
+
+        if show_plot:
+            plt.show()
+
+    @staticmethod
+    def plot_data_with_signals(data, signals, show_plot=True):
+        plt.figure(figsize=(15, 7))
+
+        for symbol in data.columns:
+            plt.plot(data.index, data[symbol], label=symbol)
+
+        for signal in signals:
+            color = 'green' if signal['direction'] == 1 else 'red'
+            plt.scatter(signal['timestamp'], signal['price'], color=color, marker='o' if signal['direction'] == 1 else 'x')
+
+        plt.legend()
+        plt.title("Price Data with Trade Signals")
+        plt.xlabel("Timestamp")
+        plt.ylabel("Price")
+
+        if show_plot:
+            plt.show()
+
+    @staticmethod
+    def plot_price_and_spread(price_data:pd.DataFrame, spread:list, signals: list, split_date=None, show_plot=True):
+        """
+        Plot multiple ticker data on the left y-axis and spread with mean and standard deviations on the right y-axis.
+        
+        Parameters:
+            price_data (pd.DataFrame): DataFrame containing the data with timestamps as index and multiple ticker columns.
+            spread (pd.Series): Series containing the spread data.
+        """
+        # Extract data from the DataFrame
+        timestamps = price_data.index
+        spread = pd.Series(spread, index=timestamps) 
+
+        # Create a figure and primary axis for price data (left y-axis)
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+
+        # Plot each ticker on the left y-axis
+        colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black', 'orange']  # Extend this list as needed
+        for i, ticker in enumerate(price_data.columns):
+            color = colors[i % len(colors)]  # Cycle through colors
+            ax1.plot(timestamps, price_data[ticker], label=ticker, color=color, linewidth=2)
+
+        ax1.set_yscale('linear')
+        ax1.set_ylabel('Price')
+        ax1.legend(loc='upper left')
+
+        # Calculate mean and standard deviations for spread
+        spread_mean = spread.rolling(window=20).mean()  # Adjust the window size as needed
+        spread_std_1 = spread.rolling(window=20).std()  # 1 standard deviation
+        spread_std_2 = 2 * spread.rolling(window=20).std()  # 2 standard deviations
+
+        # Create a secondary axis for the spread with mean and standard deviations (right y-axis)
+        ax2 = ax1.twinx()
+
+        # Plot Spread on the right y-axis
+        ax2.plot(timestamps, spread, label='Spread', color='purple', linewidth=2)
+        ax2.plot(timestamps, spread_mean, label='Mean', color='orange', linestyle='--')
+        ax2.fill_between(timestamps, spread_mean - spread_std_1, spread_mean + spread_std_1, color='gray', alpha=0.2, label='1 Std Dev')
+        ax2.fill_between(timestamps, spread_mean - spread_std_2, spread_mean + spread_std_2, color='gray', alpha=0.4, label='2 Std Dev')
+        ax2.set_yscale('linear')
+        ax2.set_ylabel('Spread and Statistics')
+        ax2.legend(loc='upper right')
+
+
+        # Plot signals
+        for signal in signals:
+            ts = pd.to_datetime(signal['timestamp'])
+            price = signal['price']
+            action = signal['action']
+            if action in ['LONG', 'COVER']:
+                marker = '^'
+                color = 'lime'
+            elif action in ['SHORT', 'SELL']:
+                marker = 'v'
+                color = 'red'
+            else:
+                # Default marker for undefined actions
+                marker = 'o'
+                color = 'gray'
+            ax1.scatter(ts, price, marker=marker, color=color, s=100)
+
+        # Draw a dashed vertical line to separate test and training data
+        if split_date is not None:
+            split_date = pd.to_datetime(split_date)
+            ax1.axvline(x=split_date, color='black', linestyle='--', linewidth=1)
+
+        # Add grid lines
+        ax1.grid(True)
+
+        # Format x-axis labels for better readability
+        plt.xticks(rotation=45)
+        plt.xlabel('Timestamp')
+
+        # Title
+        plt.title('Price Data, Spread, and Statistics Over Time')
+
+        # Show the plot
+        plt.tight_layout()
+
         if show_plot:
             plt.show()

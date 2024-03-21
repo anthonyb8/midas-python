@@ -1,14 +1,14 @@
 import logging
 from queue import Queue
-from datetime import datetime
-from ibapi.contract import Contract
 from ibapi.order import Order
+from ibapi.contract import Contract
 
 from .dummy_broker import DummyBroker
 from midas.portfolio import PortfolioServer
-from midas.account_data import Position
-from midas.events import ExecutionEvent, OrderEvent, TradeInstruction, Action
+from midas.account_data import Position, Trade
 from midas.performance import PerformanceManager
+from midas.events import ExecutionEvent, Action, BaseOrder
+from midas.events import ExecutionEvent, OrderEvent, TradeInstruction, Action
 
 class BrokerClient:
     """
@@ -44,7 +44,7 @@ class BrokerClient:
 
         self.handle_order(timestamp, trade_id, leg_id,action ,contract,order)
 
-    def handle_order(self, timestamp: int, trade_id: int, leg_id: int, action:Action, contract:Contract, order:Order):
+    def handle_order(self, timestamp: int, trade_id: int, leg_id: int, action:Action, contract:Contract, order:BaseOrder):
         """
         Handles the the execution of the order, simulation the placing of order and creation of execution event.
         
@@ -61,12 +61,12 @@ class BrokerClient:
         if not isinstance(event,ExecutionEvent):
             raise ValueError("'event' must be of type ExecutionEvent instance.")
         
-        ticker = event.contract.symbol
+        contract = event.contract
         
         self.update_positions()
         self.update_account()
         self.update_equity_value()
-        self.update_trades(ticker)
+        self.update_trades(contract)
   
     def eod_update(self):
         self.broker.mark_to_market()
@@ -91,22 +91,41 @@ class BrokerClient:
             # Now, use `position_instance` as needed, for example, to update positions in the portfolio server.
             self.portfolio_server.update_positions(contract, position_instance)
 
-    def update_trades(self, ticker:str = None):
-        if ticker:
-            trade = self.broker.return_executed_trades(ticker)
-            self.performance_manager.update_trades(trade)
+    def update_trades(self, contract:Contract = None):
+        if contract:
+            trade = self.broker.return_executed_trades(contract)
+            self.performance_manager.update_trades(Trade(
+                                                        trade_id = trade['trade_id'],
+                                                        leg_id = trade['leg_id'],
+                                                        timestamp = trade['timestamp'],
+                                                        ticker = trade['symbol'],
+                                                        quantity = trade['quantity'],
+                                                        price =  round(trade['price'],4),
+                                                        cost = trade['cost'],
+                                                        action = trade['action'],
+                                                        fees = trade['fees']
+                                                    ))
         else: 
-            last_trades = self.broker.return_executed_trades(ticker)
-
+            last_trades = self.broker.return_executed_trades()
             for contract, trade in last_trades.items():
-                self.performance_manager.update_trades(trade)
+                self.performance_manager.update_trades(Trade(
+                                                        trade_id = trade['trade_id'],
+                                                        leg_id = trade['leg_id'],
+                                                        timestamp = trade['timestamp'],
+                                                        ticker = trade['symbol'],
+                                                        quantity = trade['quantity'],
+                                                        price =  round(trade['price'],4),
+                                                        cost = trade['cost'],
+                                                        action = trade['action'],
+                                                        fees = trade['fees']
+                                                    ))
 
     def update_account(self):
         account = self.broker.return_account()
         self.portfolio_server.update_account_details(account)
 
     def update_equity_value(self):
-        self.broker._update_account_equity_value()
+        self.broker._update_account_equity_value() 
         equity = self.broker.return_equity_value()
         self.performance_manager.update_equity(equity)
        

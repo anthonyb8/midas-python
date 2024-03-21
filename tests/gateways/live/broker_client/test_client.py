@@ -1,12 +1,13 @@
 import unittest
-from unittest.mock import Mock, patch
-from ibapi.contract import Contract
-from ibapi.order import Order
 from decouple import config
+from ibapi.order import Order
+from ibapi.contract import Contract
+from unittest.mock import Mock, patch
 
 from midas.gateways.live import BrokerClient
-from midas.events import OrderEvent, Action
+from midas.events import OrderEvent, Action, BaseOrder, MarketOrder
 
+#TODO : Edge Cases
 
 class TestBrokerClient(unittest.TestCase):
     def setUp(self):
@@ -14,10 +15,12 @@ class TestBrokerClient(unittest.TestCase):
         self.mock_logger = Mock()
         self.mock_event_queue = Mock()
         self.mock_portfolio_server = Mock()
+        self.mock_performance_manager = Mock()
 
         self.broker_client = BrokerClient(event_queue=self.mock_event_queue, 
                                             logger=self.mock_logger,
                                             portfolio_server=self.mock_portfolio_server,
+                                            performance_manager=self.mock_performance_manager,
                                             host='127.0.0.0',
                                             port= "7497",
                                             clientId=1,
@@ -59,7 +62,7 @@ class TestBrokerClient(unittest.TestCase):
         self.valid_action = Action.LONG
         self.valid_trade_id = 2
         self.valid_leg_id =  6
-        self.valid_order = Order()
+        self.valid_order = MarketOrder(action=self.valid_action, quantity=10)
         self.valid_contract = Contract()
 
         event = OrderEvent(timestamp=self.valid_timestamp,
@@ -71,7 +74,7 @@ class TestBrokerClient(unittest.TestCase):
         
         with patch.object(self.broker_client, 'handle_order') as mock_method:
             self.broker_client.on_order(event)
-            mock_method.assert_called_once_with(self.valid_contract, self.valid_order) 
+            mock_method.assert_called_once_with(self.valid_contract, self.valid_order.order) 
 
     def test_handle_order(self):
         id = 10
@@ -84,18 +87,11 @@ class TestBrokerClient(unittest.TestCase):
             mock_method.assert_called_once_with(orderId=id, contract=self.valid_contract, order=self.valid_order)
             self.assertEqual(self.broker_client.app.next_valid_order_id, id+1)
 
-
     # Type Validation
     def test_on_order_valueerror(self):
         with self.assertRaisesRegex(ValueError,"'event' must be of type OrderEvent instance."):
             self.broker_client.on_order('event')
             
-    # Edge Cases
-            
-    # Integration
-        
-
-
-
+    
 if __name__ == "__main__":
     unittest.main()

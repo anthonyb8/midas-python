@@ -382,24 +382,6 @@ class TestMarketEvent(unittest.TestCase):
     def test_empty_data_validation(self):
         with self.assertRaisesRegex(ValueError, "'data' dictionary cannot be empty"):
             MarketEvent(data={}, timestamp=self.valid_timestamp)
-    
-    # Edge Cases
-    #     Extreme Values in MarketData: Test with extreme or boundary values for numerical fields within MarketData objects (e.g., very high, very low, negative).
-
-    # Large Volume of data Entries: Assess performance and correctness when data contains a large number of entries, which might simulate a high-volume trading day.
-
-    # Invalid ISO Timestamps Beyond Format: Although you're checking the format, consider timestamps that are technically correct in format but invalid in content (e.g., "2024-02-30T25:61:00").
-
-    # Time Zone Awareness: If your application will operate across multiple time zones, consider tests that validate how time zone information is handled or ignored, especially if using datetime.fromisoformat which does not handle time zones beyond "Z" for UTC.
-
-    # Handling of Leap Seconds: ISO 8601 format can include leap seconds. It might be worth considering how or if your application needs to handle such a case.
-
-    # Concurrent Modifications: If the MarketEvent object or its data could be accessed or modified concurrently, consider testing for race conditions or state inconsistencies.
-
-    # Serialization/Deserialization: If MarketEvent objects are to be serialized (e.g., to JSON) and deserialized back, testing the integrity of this process can be crucial, especially with respect to the ISO timestamp format.
-
-    # Comparison and Sorting: If MarketEvent objects are compared or sorted (e.g., by timestamp), tests should ensure that these operations behave as expected.
-
 
 if __name__ == "__main__":
     unittest.main()

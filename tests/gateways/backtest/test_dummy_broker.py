@@ -1,16 +1,17 @@
 import unittest
-from unittest.mock import Mock, patch
+from ibapi.order import Order
 from contextlib import ExitStack
 from ibapi.contract import Contract
-from ibapi.order import Order
+from unittest.mock import Mock, patch
 
-from midas.gateways.backtest.dummy_broker import DummyBroker, PositionDetails, ExecutionDetails
 from midas.order_book import OrderBook
-from midas.events import ExecutionEvent, Action, BaseOrder, TradeInstruction, MarketOrder
 from midas.account_data import AccountDetails, EquityDetails
-from midas.symbols import Symbol, Future, Equity, Currency,Exchange, Future
+from midas.symbols.symbols import Symbol, Future, Equity, Currency,Exchange, Future
+from midas.events import ExecutionEvent, Action, BaseOrder, TradeInstruction, MarketOrder
+from midas.gateways.backtest.dummy_broker import DummyBroker, PositionDetails, ExecutionDetails
 
 #TODO : edge cases/ integration
+
 class TestDummyClient(unittest.TestCase):
     def setUp(self) -> None:
         # Instantiate Dummy Client

@@ -1,13 +1,17 @@
 import logging
-from typing import Dict,List, Union
 from queue import Queue
-from ibapi.contract import Contract
 from ibapi.order import Order
+from ibapi.contract import Contract
+from typing import Dict,List, Union
 
-from midas.events import  SignalEvent, OrderEvent,  LimitOrder, MarketOrder, StopLoss, Action, OrderType, TradeInstruction
 from midas.order_book import OrderBook
 from midas.portfolio import PortfolioServer
-from midas.symbols import Symbol, Future, Equity
+from midas.symbols.symbols import Symbol, Future, Equity
+from midas.events import  (SignalEvent, OrderEvent,  
+                           LimitOrder, MarketOrder, StopLoss, 
+                           Action, OrderType, TradeInstruction, BaseOrder)
+
+# TODO : edge case
 
 class OrderManager:
     def __init__(self, symbols_map: Dict[str, Symbol], event_queue: Queue, order_book:OrderBook, portfolio_server: PortfolioServer, logger:logging.Logger):
@@ -130,7 +134,7 @@ class OrderManager:
         except (ValueError, TypeError) as e:
             raise RuntimeError(f"Failed to create or queue SignalEvent due to input error: {e}") from e
     
-    def _set_order(self, timestamp:int, trade_id:int, leg_id:int, action: Action, contract: Contract, order: Order):
+    def _set_order(self, timestamp:int, trade_id:int, leg_id:int, action: Action, contract: Contract, order: BaseOrder):
         """
         Create and queue an OrderEvent.
 
@@ -138,7 +142,7 @@ class OrderManager:
             order_detail: Details of the order to be created and queued.
         """
         try:
-            order_event = OrderEvent(timestamp, trade_id, leg_id,action, contract, order)
+            order_event = OrderEvent(timestamp=timestamp, trade_id=trade_id, leg_id=leg_id, action=action, contract=contract, order=order)
             self._event_queue.put(order_event)
         except (ValueError, TypeError) as e:
             raise RuntimeError(f"Failed to create or queue OrderEvent due to input error: {e}") from e

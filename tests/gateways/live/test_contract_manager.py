@@ -1,12 +1,13 @@
 import unittest
 import threading
-from unittest.mock import patch, Mock
 from ibapi.contract import Contract
+from unittest.mock import patch, Mock
 
 
 from midas.gateways.live import ContractManager
-from midas.symbols import Future, Equity, Currency, Exchange
+from midas.symbols.symbols import Future, Equity, Currency, Exchange
 
+#TODO : edge cases
 
 class TestContractManager(unittest.TestCase):
     def setUp(self) -> None:

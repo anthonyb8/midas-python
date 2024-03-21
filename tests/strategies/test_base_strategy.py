@@ -6,17 +6,22 @@ from midas.strategies import BaseStrategy
 from midas.events import BarData, MarketEvent, SignalEvent
 from midas.events import  SignalEvent, MarketEvent, TradeInstruction, Action, OrderType
 
+# TODO: Edge case testing
+
 class TestStrategy(BaseStrategy):
+    def prepare(self):
+        pass
+
     def handle_market_data(self):
         pass
 
-    def entry_signal(self):
+    def _entry_signal(self):
         pass
 
-    def exit_signal(self):
+    def _exit_signal(self):
         pass
 
-    def asset_allocation(self):
+    def _asset_allocation(self):
         pass
 
 class TestTestStrategy(unittest.TestCase):
@@ -80,11 +85,6 @@ class TestTestStrategy(unittest.TestCase):
         # Test failure to create signal event
         with self.assertRaisesRegex(RuntimeError, "Failed to create or queue SignalEvent due to input error"):
             self.test_strategy.set_signal([], self.valid_trade_capital, self.valid_timestamp)
-
-
-
-
-    # Derived Class Constraints
 
 if __name__ == "__main__":
     unittest.main()

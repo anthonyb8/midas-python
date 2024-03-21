@@ -2,7 +2,7 @@ import logging
 from typing import Dict
 from ibapi.contract import Contract
 
-from midas.symbols import Symbol
+from midas.symbols.symbols import Symbol
 from midas.account_data import Position,ActiveOrder, AccountDetails
 
 class PortfolioServer:

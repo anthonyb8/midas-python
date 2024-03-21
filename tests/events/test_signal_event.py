@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime, timezone
 
-from midas.events import TradeInstruction, SignalEvent
 from midas.events import OrderType, Action
+from midas.events import TradeInstruction, SignalEvent
 
 # TODO : Edge Cases
 
@@ -141,8 +141,6 @@ class TestTradeInsructions(unittest.TestCase):
                                 leg_id=0,
                                 weight=self.valid_weight)
 
-    # Edge Case
-
 class TestSignalEvent(unittest.TestCase):
     def setUp(self) -> None:
         self.valid_timestamp = 1651500000
@@ -235,9 +233,7 @@ class TestSignalEvent(unittest.TestCase):
         self.assertEqual(signal_dict['timestamp'], serialized_timestamp) # cehck timestmap covnersin to ISOforamt when serialized
         self.assertEqual(len(signal_dict['trade_instructions']), len(self.valid_trade_instructions)) # checkall trade instructions include in serialization
 
-
-    # Edge Cases
-        
+    # Edge Cases  
     # def test_future_timestamp_validation(self):
     #     future_timestamp = "3024-11-12T12:12:00"  # Clearly in the future
     #     with self.assertRaisesRegex(ValueError, "Timestamp cannot be in the future."):
@@ -248,9 +244,6 @@ class TestSignalEvent(unittest.TestCase):
     #     duplicate_trade = TradeInstruction(ticker='GOOG', order_type=OrderType.MARKET, action=Action.LONG, trade_id=2, leg_id=7, weight=0.3)
     #     with self.assertRaisesRegex(ValueError, "Duplicate trade_id detected."):
     #         signal = Signal(timestamp=self.valid_timestamp, trade_instructions=[self.valid_trade1, duplicate_trade])
-
-
-    # Further comparisons as necessary
 
 
 if __name__ == "__main__":

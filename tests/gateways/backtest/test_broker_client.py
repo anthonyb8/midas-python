@@ -1,12 +1,13 @@
 import unittest
-from unittest.mock import Mock, patch
-from ibapi.contract import Contract
 from ibapi.order import Order
 from contextlib import ExitStack
+from ibapi.contract import Contract
+from unittest.mock import Mock, patch
 
 from midas.gateways.backtest import BrokerClient
-from midas.events import OrderEvent, ExecutionEvent, Action
-from midas.account_data import PositionDetails, AccountDetails, ExecutionDetails, EquityDetails
+from midas.account_data import AccountDetails, EquityDetails
+from midas.events import OrderEvent, ExecutionEvent, Action, MarketOrder
+from midas.gateways.backtest.dummy_broker import PositionDetails, ExecutionDetails
 
 # TODO: # Type/edge/integration
 
@@ -15,17 +16,12 @@ class TestBrokerClient(unittest.TestCase):
         self.mock_event_queue = Mock()
         self.mock_logger = Mock()
         self.mock_portfolio_server = Mock()
-        self.mock_portfolio_server = Mock() 
+        self.mock_performance_manager = Mock() 
         self.mock_dummy_broker =Mock()
 
-        self.broker_client = BrokerClient(self.mock_event_queue, self.mock_logger,self.mock_portfolio_server, self.mock_dummy_broker)
+        self.broker_client = BrokerClient(self.mock_event_queue, self.mock_logger,self.mock_portfolio_server,self.mock_performance_manager, self.mock_dummy_broker)
     
     # Basic Validation
-    # def test_construction(self):
-    #     with patch.object(self.broker_client, 'update_account') as mock_method:
-    #         self.broker_client = BrokerClient(self.mock_event_queue, self.mock_logger,self.mock_portfolio_server, self.mock_dummy_broker)
-    #         mock_method.assert_called_once() 
-    
     def test_handle_order(self):
         timestamp = 1651500000
         action = Action.LONG
@@ -33,17 +29,18 @@ class TestBrokerClient(unittest.TestCase):
         leg_id =  6
         order = Order()
         contract = Contract()
-
+        
+        # Test
         with patch.object(self.mock_dummy_broker, 'placeOrder') as mock_method:
             self.broker_client.handle_order(timestamp, trade_id, leg_id, action, contract, order)
-            mock_method.assert_called_once() 
+            mock_method.assert_called_once() # check placeOrder called on a valid order event
 
     def test_on_order(self):
         self.valid_timestamp = 1651500000
         self.valid_action = Action.LONG
         self.valid_trade_id = 2
         self.valid_leg_id =  6
-        self.valid_order = Order()
+        self.valid_order = MarketOrder(self.valid_action, 10)
         self.valid_contract = Contract()
 
         event = OrderEvent(timestamp=self.valid_timestamp,
@@ -52,6 +49,8 @@ class TestBrokerClient(unittest.TestCase):
                            action=self.valid_action,
                            order=self.valid_order,
                            contract=self.valid_contract)
+        
+        # Test Valid Order handle_order shoudl be called
         with patch.object(self.broker_client, 'handle_order') as mock_method:
             self.broker_client.on_order(event)
             mock_method.assert_called_once() 
@@ -73,11 +72,12 @@ class TestBrokerClient(unittest.TestCase):
                 initial_margin = 1000,
                 unrealizedPnL=0
         )
-        self.mock_dummy_broker.return_positions.return_value = {contract :valid_position}
+        self.mock_dummy_broker.return_positions.return_value = {contract :valid_position} # mock position
 
+        # Test portfolio server update postions shoudl be called on postion updates
         with patch.object(self.mock_portfolio_server, 'update_positions') as mock_method:
-            self.broker_client.update_positions()
-            mock_method.assert_called_once() 
+            self.broker_client.update_positions() # test 
+            mock_method.assert_called_once()  # check called
 
     def test_update_trades_valid(self):
         aapl_contract = Contract()
@@ -99,11 +99,12 @@ class TestBrokerClient(unittest.TestCase):
                 fees= 70 # because not actually a trade
             )
         
-        self.mock_dummy_broker.return_executed_trades.return_value = {aapl_contract : valid_trade_appl}
+        self.mock_dummy_broker.return_executed_trades.return_value = {aapl_contract : valid_trade_appl} # mock trade
 
-        with patch.object(self.mock_portfolio_server, 'update_trades') as update_trades:
-            self.broker_client.update_trades()
-            update_trades.assert_called_once_with(valid_trade_appl)
+        # Test performance manager update trades called on new trade
+        with patch.object(self.mock_performance_manager, 'update_trades') as update_trades:
+            self.broker_client.update_trades() # test
+            update_trades.assert_called_once() # check call
 
     def test_update_account_valid(self):
         account = AccountDetails(Timestamp=165000000, 
@@ -113,24 +114,25 @@ class TestBrokerClient(unittest.TestCase):
                         UnrealizedPnL= 0)
         
 
-        self.mock_dummy_broker.return_account.return_value = account
-
+        self.mock_dummy_broker.return_account.return_value = account # mock account
+        # Test portfolio server account updated on account changes
         with patch.object(self.mock_portfolio_server, 'update_account_details') as mock_update_account_details:
-            self.broker_client.update_account()
-            mock_update_account_details.assert_called_once_with(account)
+            self.broker_client.update_account() # test
+            mock_update_account_details.assert_called_once_with(account) # check update
         
     def test_update_equity_value_valid(self):
         equity = EquityDetails(
-                timestamp= 123456,
-                equity_value =100000
-                )
+                    timestamp= 123456,
+                    equity_value =100000
+                    )
+        # Test 
         with ExitStack() as stack:
-            mock_m1 = stack.enter_context(patch.object(self.mock_dummy_broker,'_update_account_equity_value'))
-            mock_m2 = stack.enter_context(patch.object(self.mock_dummy_broker,'return_equity_value', return_value = equity))
-            mock_m3 = stack.enter_context(patch.object(self.mock_portfolio_server,'update_equity'))
+            mock_m1 = stack.enter_context(patch.object(self.mock_dummy_broker,'_update_account_equity_value')) # broker shoudl update equity
+            mock_m2 = stack.enter_context(patch.object(self.mock_dummy_broker,'return_equity_value', return_value = equity)) # return equity from broker to broker client 
+            mock_m3 = stack.enter_context(patch.object(self.mock_performance_manager,'update_equity')) # call performance manager to update equity log
             
             self.broker_client.update_equity_value()
-            mock_m1.assert_called_once()
+            mock_m1.assert_called_once() 
             mock_m2.assert_called_once()
             mock_m3.assert_called_once_with(equity)
 
@@ -176,7 +178,7 @@ class TestBrokerClient(unittest.TestCase):
             mock_m3.assert_called_once()
             mock_m4.assert_called_once()
 
-
     # Type/edge/integration
+            
 if __name__ =="__main__":
     unittest.main()

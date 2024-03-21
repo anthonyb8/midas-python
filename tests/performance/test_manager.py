@@ -3,16 +3,18 @@ from unittest.mock import Mock, patch
 from contextlib import ExitStack
 from ibapi.contract import Contract
 from datetime import datetime, timezone
+from pandas.testing import assert_frame_equal
 import pandas as pd
 import numpy as np
 
 from midas.performance.manager import Backtest, PerformanceManager
-from midas.account_data import EquityDetails, ExecutionDetails
-from midas.events import SignalEvent, Action
+from midas.account_data import EquityDetails, Trade
+from midas.events import SignalEvent, Action, ExecutionDetails
 from midas.command.parameters import Parameters
 from midas.events import MarketEvent, OrderEvent, SignalEvent, ExecutionEvent
-from midas.events import MarketData, BarData, TickData, OrderType, Action, TradeInstruction, Trade
+from midas.events import MarketData, BarData, QuoteData, OrderType, Action, TradeInstruction, MarketDataType
 
+#TODO: edge cases
 class TestBacktest(unittest.TestCase):    
     def setUp(self) -> None:
         self.mock_db_client = Mock()
@@ -126,20 +128,17 @@ class TestPerformanceManager(unittest.TestCase):
     def setUp(self) -> None:
         self.mock_db_client = Mock()
         self.mock_logger = Mock()
-        self.mock_parameters = {
-
-
-            "strategy_name": "cointegrationzscore", 
-            "capital": 100000, 
-            "data_type": "BAR", 
-            "strategy_allocation": 1.0, 
-            "train_start": "2018-05-18", 
-            "train_end": "2023-01-19", 
-            "test_start": "2023-01-19", 
-            "test_end": "2024-01-19", 
-            "tickers": ["HE.n.0", "ZC.n.0"], 
-            "benchmark": ["^GSPC"]
-        }
+        self.mock_parameters = Parameters(
+            strategy_name="cointegrationzscore", 
+            capital= 100000, 
+            data_type= MarketDataType.BAR, 
+            train_start= "2018-05-18", 
+            train_end= "2023-01-18", 
+            test_start= "2023-01-19", 
+            test_end= "2024-01-19", 
+            tickers= ["HE.n.0", "ZC.n.0"], 
+            benchmark= ["^GSPC"]
+        )
 
         self.performance_manager = PerformanceManager(self.mock_db_client, self.mock_logger, self.mock_parameters)
 
@@ -185,57 +184,57 @@ class TestPerformanceManager(unittest.TestCase):
             }]
         }]
 
-
     # Basic Validation
-    def test_update_trades_new_trade_valid(self):        
-        trade = ExecutionDetails(
+    def test_update_trades_new_trade_valid(self): 
+        trade = Trade(
                 timestamp= 165000000,
                 trade_id= 2,
                 leg_id=2,
-                symbol= 'HEJ4',
+                ticker = 'HEJ4',
                 quantity= round(-10,4),
                 price= 50,
                 cost= round(50 * -10, 2),
                 action=  Action.SHORT.value,
                 fees= 70 # because not actually a trade
-        )
+        )       
 
         self.performance_manager.update_trades(trade)
-        self.assertEqual(self.performance_manager.trades[0], trade)
+        self.assertEqual(self.performance_manager.trades[0], trade.to_dict())
         self.mock_logger.info.assert_called_once()
     
     def test_update_trades_old_trade_valid(self):        
-        trade = ExecutionDetails(
+        trade = Trade(
                 timestamp= 165000000,
                 trade_id= 2,
                 leg_id=2,
-                symbol= 'HEJ4',
+                ticker = 'HEJ4',
                 quantity= round(-10,4),
                 price= 50,
                 cost= round(50 * -10, 2),
                 action=  Action.SHORT.value,
                 fees= 70 # because not actually a trade
-        )
-        self.performance_manager.trades.append(trade)
+        )  
+        self.performance_manager.trades.append(trade.to_dict())
 
         self.performance_manager.update_trades(trade)
-        self.assertEqual(self.performance_manager.trades[0], trade)
+        self.assertEqual(self.performance_manager.trades[0], trade.to_dict())
+        self.assertEqual(len(self.performance_manager.trades), 1)
         self.assertFalse(self.mock_logger.info.called)
     
-    def test_output_account(self):
-        trade = ExecutionDetails(
+    def test_output_trades(self):
+        trade = Trade(
                 timestamp= 165000000,
                 trade_id= 2,
                 leg_id=2,
-                symbol= 'HEJ4',
+                ticker = 'HEJ4',
                 quantity= round(-10,4),
                 price= 50,
                 cost= round(50 * -10, 2),
                 action=  Action.SHORT.value,
                 fees= 70 # because not actually a trade
-        )
+        ) 
         self.performance_manager.update_trades(trade)
-        self.mock_logger.info.assert_called_once_with("\nTrades Updated: \n {'timestamp': '1975-03-25T17:20:00+00:00', 'trade_id': 2, 'leg_id': 2, 'symbol': 'HEJ4', 'quantity': -10, 'price': 50, 'cost': -500, 'action': 'SHORT', 'fees': 70} \n")
+        self.mock_logger.info.assert_called_once_with("\nTrades Updated: \n {'timestamp': '1975-03-25T17:20:00+00:00', 'trade_id': 2, 'leg_id': 2, 'ticker': 'HEJ4', 'quantity': -10, 'price': 50, 'cost': -500, 'action': 'SHORT', 'fees': 70} \n")
 
     def test_update_signals_valid(self):        
         self.valid_trade1 = TradeInstruction(ticker = 'AAPL',
@@ -300,17 +299,17 @@ class TestPerformanceManager(unittest.TestCase):
         self.assertEqual(len(self.performance_manager.equity_value), 1)
         self.assertFalse(self.mock_logger.info.called)
 
-    def test_aggregate_trades(self):
+    def test_aggregate_trades_valid(self):
         # Adjusted trades data to use ExecutionDetails format
         self.performance_manager.trades = [
-            ExecutionDetails(timestamp=165500000, trade_id=1, leg_id=1, symbol='XYZ', quantity=10, price=10, cost=100, action=Action.LONG.value),
-            ExecutionDetails(timestamp=165000001, trade_id=1, leg_id=2, symbol='XYZ', quantity=-10, price=15, cost=150, action=Action.SELL.value),
-            ExecutionDetails(timestamp=165000002, trade_id=2, leg_id=1, symbol='HEJ4', quantity=-10, price=20, cost=500, action=Action.SHORT.value),
-            ExecutionDetails(timestamp=165000003, trade_id=2, leg_id=2, symbol='HEJ4', quantity=10, price=18, cost=180, action=Action.COVER.value)
+            ExecutionDetails(timestamp='2022-01-01', trade_id=1, leg_id=1, symbol='XYZ', quantity=10, price=10, cost=-100,fees=10, action=Action.LONG.value),
+            ExecutionDetails(timestamp='2022-01-02', trade_id=1, leg_id=1, symbol='XYZ', quantity=-10, price=15, cost=150, fees=10,action=Action.SELL.value),
+            ExecutionDetails(timestamp='2022-01-01', trade_id=2, leg_id=1, symbol='HEJ4', quantity=-10, price=20, cost=500, fees=10,action=Action.SHORT.value),
+            ExecutionDetails(timestamp='2022-01-02', trade_id=2, leg_id=1, symbol='HEJ4', quantity=10, price=18, cost=-180, fees=10,  action=Action.COVER.value)
         ]
 
         # Call the method
-        aggregated_df = self.performance_manager.aggregate_trades()
+        aggregated_df = self.performance_manager._aggregate_trades()
 
         # Check if the result is a DataFrame
         self.assertIsInstance(aggregated_df, pd.DataFrame, "Result should be a pandas DataFrame")
@@ -319,56 +318,27 @@ class TestPerformanceManager(unittest.TestCase):
         self.assertFalse(aggregated_df.empty, "Resulting DataFrame should not be empty")
 
         # Validate the expected columns are present
-        expected_columns = ['trade_id', 'start_date', 'end_date', 'entry_value', 'exit_value', 'net_gain/loss', 'gain/loss (%)']
+        expected_columns = ['trade_id', 'start_date', 'end_date', 'entry_value', 'exit_value', 'pnl', 'gain/loss']
         for column in expected_columns:
             self.assertIn(column, aggregated_df.columns, f"Column {column} is missing in the result")
 
         # Validate calculations for a specific trade_id
         trade_1 = aggregated_df[aggregated_df['trade_id'] == 1]
-        self.assertEqual(trade_1.iloc[0]['entry_value'], 100, "Incorrect entry value for trade_id 1")
+        self.assertEqual(trade_1.iloc[0]['entry_value'], -100, "Incorrect entry value for trade_id 1")
         self.assertEqual(trade_1.iloc[0]['exit_value'], 150, "Incorrect exit value for trade_id 1")
-        self.assertEqual(trade_1.iloc[0]['net_gain/loss'], 50, "Incorrect net gain/loss for trade_id 1")
-        self.assertEqual(trade_1.iloc[0]['gain/loss (%)'], 50, "Incorrect gain/loss percentage for trade_id 1")
+        self.assertEqual(trade_1.iloc[0]['fees'], 20, "Incorrect fees for trade_id 1")
+        self.assertEqual(trade_1.iloc[0]['pnl'], 30, "Incorrect net pnl for trade_id 1")
+        self.assertEqual(trade_1.iloc[0]['gain/loss'], 0.30, "Incorrect gain/loss for trade_id 1")
 
-    def test_total_trade_fees(self):
-        trade1 = ExecutionDetails(
-                timestamp= 165000000,
-                trade_id= 2,
-                leg_id=2,
-                symbol= 'HEJ4',
-                quantity= round(-10,4),
-                price= 50,
-                cost= round(50 * -10, 2),
-                action=  Action.SHORT.value,
-                fees= 70 # because not actually a trade
-        )
-        self.performance_manager.trades.append(trade1)
-
-        trade2 = ExecutionDetails(
-                timestamp= 165000000,
-                trade_id= 2,
-                leg_id=2,
-                symbol= 'HEJ4',
-                quantity= round(-10,4),
-                price= 50,
-                cost= round(50 * -10, 2),
-                action=  Action.SHORT.value,
-                fees= 700 # because not actually a trade
-        )
-        self.performance_manager.trades.append(trade2)
-
-        result = self.performance_manager.total_trade_fees()
-        self.assertEqual(result, 770)
-
-    def test_calculate_return_and_drawdown(self):
+    def test_calculate_return_and_drawdown_valid(self):
         self.performance_manager.equity_value = [
-            EquityDetails(timestamp=int(datetime(2022, 1, 1).replace(tzinfo=timezone.utc).timestamp()), equity_value=1000.0),
-            EquityDetails(timestamp=int(datetime(2022, 1, 2).replace(tzinfo=timezone.utc).timestamp()), equity_value=1010.0),
-            EquityDetails(timestamp=int(datetime(2022, 1, 3).replace(tzinfo=timezone.utc).timestamp()), equity_value=1005.0),
-            EquityDetails(timestamp=int(datetime(2022, 1, 4).replace(tzinfo=timezone.utc).timestamp()), equity_value=1030.0),
+            EquityDetails(timestamp='2022-01-01', equity_value=1000.0),
+            EquityDetails(timestamp='2022-01-02', equity_value=1010.0),
+            EquityDetails(timestamp='2022-01-03', equity_value=1005.0),
+            EquityDetails(timestamp='2022-01-04', equity_value=1030.0),
         ]
 
-        df = self.performance_manager.calculate_return_and_drawdown()
+        df = self.performance_manager._calculate_return_and_drawdown()
 
         # Check if the result is a DataFrame
         self.assertTrue(isinstance(df, pd.DataFrame), "Result should be a pandas DataFrame")
@@ -399,76 +369,269 @@ class TestPerformanceManager(unittest.TestCase):
         expected_drawdowns = (equity_value - rolling_max) / rolling_max  # Calculate drawdowns in decimal format
         self.assertAlmostEqual(df['drawdown'].min(), expected_drawdowns.min(), places=4, msg="Drawdown calculation does not match expected value")
 
-    def test_align_equity_and_benchmark_aligned_dates(self):
+    def test_standardize_to_daily_values_valid(self):
         self.equity_curve = [
-            EquityDetails(timestamp=int(datetime(2022, 1, 1).replace(tzinfo=timezone.utc).timestamp()), equity_value=1000.0),
-            EquityDetails(timestamp=int(datetime(2022, 1, 2).replace(tzinfo=timezone.utc).timestamp()), equity_value=1010.0),
-            EquityDetails(timestamp=int(datetime(2022, 1, 3).replace(tzinfo=timezone.utc).timestamp()), equity_value=1005.0)
+            EquityDetails(timestamp='2022-01-01', equity_value=1000.0),
+            EquityDetails(timestamp='2022-01-02', equity_value=1010.0),
+            EquityDetails(timestamp='2022-01-03', equity_value=1005.0)
         ]
-
-        self.benchmark_curve = [
-            {'timestamp': '2022-01-01', 'close': 2000.0},
-            {'timestamp': '2022-01-02', 'close': 2010.0},
-            {'timestamp': '2022-01-03', 'close': 2005.0},
-        ]
-
-        equity_values_array, benchmark_close_array = self.performance_manager.align_equity_and_benchmark(self.equity_curve, self.benchmark_curve)
         
+        # Expected Data
+        data = {
+                'timestamp': ['2022-01-01', '2022-01-02', '2022-01-03'],
+                'equity_value': [1000.0, 1010.0, 1005.0],
+            }
+        expected_df = pd.DataFrame(data)
+        expected_df['timestamp'] = pd.to_datetime(expected_df['timestamp'])
+        expected_df.set_index('timestamp', inplace=True)
+        expected_df = expected_df.asfreq('D')
+
+        # Test 
+        df = self.performance_manager._standardize_to_daily_values(self.equity_curve)
+        
+        # Validate
         # Validate the output types
-        self.assertIsInstance(equity_values_array, np.ndarray, "Equity values should be a NumPy array")
-        self.assertIsInstance(benchmark_close_array, np.ndarray, "Benchmark values should be a NumPy array")
+        self.assertIsInstance(df, pd.DataFrame, "Equity values should be a dataframe.")
         
         # Validate the lengths of the arrays
-        self.assertEqual(len(equity_values_array), len(benchmark_close_array), "Arrays should have the same length")
+        self.assertEqual(len(df), len(self.equity_curve), "Arrays should have the same length")
         
-        # Validate the data types of the arrays
-        self.assertEqual(equity_values_array.dtype, np.float64, "Equity values array should be of type float64")
-        self.assertEqual(benchmark_close_array.dtype, np.float64, "Benchmark values array should be of type float64")
+        # Validate the values are the last of each day
+        assert_frame_equal(df, expected_df)
 
-    # def test_align_equity_and_benchmark_unaligned_dates(self):
-    #     # Equity curve has an extra date not present in the benchmark curve and vice versa
-    #     self.equity_curve = [
-    #         {'timestamp': '2022-01-01', 'equity_value': 1000.0},
-    #         {'timestamp': '2022-01-02', 'equity_value': 1010.0},
-    #         {'timestamp': '2022-01-04', 'equity_value': 1020.0},  # Unaligned date
-    #     ]
-    #     self.benchmark_curve = [
-    #         {'timestamp': '2022-01-01', 'close': 2000.0},
-    #         {'timestamp': '2022-01-02', 'close': 2010.0},
-    #         {'timestamp': '2022-01-03', 'close': 2020.0},  # Unaligned date
-    #     ]
+    def test_standardize_to_daily_values_intraday_valid(self):
+        self.equity_curve = [
+            EquityDetails(timestamp= '2022-01-01 09:30', equity_value= 1000.0),
+            EquityDetails(timestamp ='2022-01-01 16:00', equity_value= 1005.0),
+            EquityDetails(timestamp= '2022-01-02 09:30', equity_value= 1010.0),
+            EquityDetails(timestamp= '2022-01-02 12:00', equity_value= 1012.0),
+            EquityDetails(timestamp= '2022-01-02 16:00', equity_value= 1015.0),
+            EquityDetails(timestamp= '2022-01-03 09:30', equity_value= 1005.0),
+            EquityDetails(timestamp= '2022-01-03 11:00', equity_value= 1007.0),
+            EquityDetails(timestamp= '2022-01-03 16:00', equity_value= 1010.0)
+        ]
 
-    #     # Expected to align on 2022-01-01 and 2022-01-02 only
-    #     equity_values_array, benchmark_close_array = self.performance_manager.align_equity_and_benchmark(self.equity_curve, self.benchmark_curve)
+        # Expected Data
+        data = {
+                'timestamp': ['2022-01-01', '2022-01-02', '2022-01-03'],
+                'equity_value': [1005.0, 1015.0, 1010.0],
+            }
+        expected_df = pd.DataFrame(data)
+        expected_df['timestamp'] = pd.to_datetime(expected_df['timestamp'])
+        expected_df.set_index('timestamp', inplace=True)
+        expected_df = expected_df.asfreq('D')
         
-    #     # Validate the lengths of the arrays (should be 2 for both, matching only the aligned dates)
-    #     self.assertEqual(len(equity_values_array), 2, "Arrays should have the same length and match only aligned dates")
-    #     self.assertEqual(len(benchmark_close_array), 2, "Arrays should have the same length and match only aligned dates")
-
-    # def test_align_equity_and_benchmark_different_time_intervals(self):
-    #     # Equity curve has multiple entries for the same day, simulating lower than daily interval
-    #     self.equity_curve = [
-    #         {'timestamp': '2022-01-01 09:00', 'equity_value': 1000.0},
-    #         {'timestamp': '2022-01-01 17:00', 'equity_value': 1010.0},  # Same day, different time
-    #         {'timestamp': '2022-01-02', 'equity_value': 1020.0},
-    #     ]
-    #     self.benchmark_curve = [
-    #         {'timestamp': '2022-01-01', 'close': 2000.0},
-    #         {'timestamp': '2022-01-02', 'close': 2010.0},
-    #     ]
-
-    #     # Expected to standardize on daily frequency, effectively aligning the last value of the day for equity
-    #     equity_values_array, benchmark_close_array = self.performance_manager.align_equity_and_benchmark(self.equity_curve, self.benchmark_curve)
+        # Test
+        df = self.performance_manager._standardize_to_daily_values(self.equity_curve)
         
-    #     # Validate the lengths of the arrays (should be 2 for both, after resampling equity to daily)
-    #     self.assertEqual(len(equity_values_array), 2, "Arrays should have the same length after resampling equity to daily")
-    #     self.assertEqual(len(benchmark_close_array), 2, "Arrays should have the same length after resampling equity to daily")
+        # Validation
+        # Validate the output type
+        self.assertIsInstance(df, pd.DataFrame, "Equity values should be a dataframe.")
 
-    # def test_calculate_statistics(self):
-    #     pass
+        # Validate the length
+        self.assertEqual(len(df), len(expected_df), "Arrays should have the same length")
+        
+        # Validate the data type of equity values
+        self.assertEqual(df['equity_value'].dtype, float, "Equity values array should be of type float")
+    
+        # Validate the values are the last of each day
+        assert_frame_equal(df, expected_df)
 
-    # def test_create_backtest(self):
-    #     pass
+    def test_align_equity_and_benchmark_valid(self):
+        self.equity_curve = [
+            EquityDetails(timestamp='2022-01-01', equity_value=1000.0),
+            EquityDetails(timestamp='2022-01-02', equity_value=1010.0),
+            EquityDetails(timestamp='2022-01-03', equity_value=1005.0)
+        ]
+
+        self.benchmark = [
+            {"timestamp":'2022-01-01', "close": 1000.0},
+            {"timestamp":'2022-01-02', "close": 1015.0},
+            {"timestamp":'2022-01-04', "close": 1010.0}
+        ]
+        # Expected
+        expected_equity_curve = np.array([1000.0, 1010.0])
+        expected_bm_curve = np.array([1000.0,1015.0])
+
+        # Test
+        equity_array, bm_array = self.performance_manager._align_equity_and_benchmark(self.equity_curve, self.benchmark)
+
+        # Validation
+        self.assertTrue(np.array_equal(equity_array, expected_equity_curve))
+        self.assertTrue(np.array_equal(bm_array, expected_bm_curve))
+
+    def test_align_equity_and_benchmark_intraday_valid(self):
+        self.equity_curve = [
+            EquityDetails(timestamp= '2022-01-01 09:30', equity_value= 1000.0),
+            EquityDetails(timestamp ='2022-01-01 16:00', equity_value= 1005.0),
+            EquityDetails(timestamp= '2022-01-02 09:30', equity_value= 1010.0),
+            EquityDetails(timestamp= '2022-01-02 12:00', equity_value= 1012.0),
+            EquityDetails(timestamp= '2022-01-02 16:00', equity_value= 1015.0),
+            EquityDetails(timestamp= '2022-01-03 09:30', equity_value= 1005.0),
+            EquityDetails(timestamp= '2022-01-03 11:00', equity_value= 1007.0),
+            EquityDetails(timestamp= '2022-01-03 16:00', equity_value= 1010.0)
+        ]
+
+        self.benchmark = [
+            {"timestamp":'2022-01-01', "close": 1000.0},
+            {"timestamp":'2022-01-02', "close": 1015.0},
+            {"timestamp":'2022-01-04', "close": 1010.0}
+        ]
+
+        # Expected
+        expected_equity_curve = np.array([1005.0, 1015.0])
+        expected_bm_curve = np.array([1000.0,1015.0])
+
+        # Test
+        equity_array, bm_array = self.performance_manager._align_equity_and_benchmark(self.equity_curve, self.benchmark)
+
+        # Validation
+        self.assertTrue(np.array_equal(equity_array, expected_equity_curve))
+        self.assertTrue(np.array_equal(bm_array, expected_bm_curve))
+    
+    def test_calculate_statistics(self):
+        # Trades
+        self.performance_manager.trades = [
+            ExecutionDetails(timestamp='2022-01-01', trade_id=1, leg_id=1, symbol='XYZ', quantity=10, price=10, cost=-100,fees=10, action=Action.LONG.value),
+            ExecutionDetails(timestamp='2022-01-02', trade_id=1, leg_id=1, symbol='XYZ', quantity=-10, price=15, cost=150, fees=10,action=Action.SELL.value),
+            ExecutionDetails(timestamp='2022-01-01', trade_id=2, leg_id=1, symbol='HEJ4', quantity=-10, price=20, cost=500, fees=10,action=Action.SHORT.value),
+            ExecutionDetails(timestamp='2022-01-02', trade_id=2, leg_id=1, symbol='HEJ4', quantity=10, price=18, cost=-180, fees=10,  action=Action.COVER.value)
+        ]
+
+        # Equity Curve
+        self.performance_manager.equity_value = [
+            EquityDetails(timestamp='2022-01-01 09:30', equity_value=1000.0),  # Initial equity
+            EquityDetails(timestamp='2022-01-01 16:00', equity_value=1000.0),  # No change, trades open
+            EquityDetails(timestamp='2022-01-02 09:30', equity_value=1030.0),  # Reflecting Trade 1 PnL
+            EquityDetails(timestamp='2022-01-02 12:00', equity_value=1330.0),  # Reflecting Trade 2 PnL
+            EquityDetails(timestamp='2022-01-02 16:00', equity_value=1330.0),  # No additional trades
+            EquityDetails(timestamp='2022-01-03 09:30', equity_value=1330.0),  # Assuming no further trades
+            EquityDetails(timestamp='2022-01-03 11:00', equity_value=1330.0),
+            EquityDetails(timestamp='2022-01-03 16:00', equity_value=1330.0)
+        ]
+
+
+        # Benchmark Curve
+        self.mock_benchmark_data = [
+            {'timestamp': '2022-01-01', 'close': 2000.0},
+            {'timestamp': '2022-01-02', 'close': 2010.0},
+            {'timestamp': '2022-01-03', 'close': 2030.0},
+        ]
+
+        # Mock the get_benchmark_data method to return the mock benchmark data
+        self.mock_db_client.get_benchmark_data.return_value = self.mock_benchmark_data
+
+        # Test 
+        self.performance_manager.calculate_statistics()
+
+        # Expected Values
+        expected_net_profit = 330
+        expected_total_return = 0.33
+        
+        equity_df = self.performance_manager._standardize_to_daily_values(self.performance_manager.equity_value)
+        equity_value = equity_df['equity_value'].to_numpy()
+        daily_returns = np.diff(equity_value ) / equity_value[:-1] # Calculate daily returns
+        risk_free_rate_daily = 0.04 / 252 # Risk-free rate adjustment for daily returns
+        excess_returns = daily_returns - risk_free_rate_daily # Excess returns calculation
+        expected_sharpe_ratio = np.mean(excess_returns) / np.std(excess_returns, ddof=1) if np.std(excess_returns, ddof=1) != 0 else 0 # Expected Sharpe ratio calculation
+
+        # Validation 
+        stats = self.performance_manager.static_stats[0] 
+        self.assertAlmostEqual(stats['net_profit'], expected_net_profit, places=2)
+        self.assertAlmostEqual(stats['total_return'], expected_total_return, places=2)
+        self.assertAlmostEqual(stats['sharpe_ratio'], expected_sharpe_ratio, places=2)
+
+    def test_create_backtest(self):
+        # Signals
+        self.valid_trade1 = TradeInstruction(ticker = 'AAPL',
+                                                order_type = OrderType.MARKET,
+                                                action = Action.LONG,
+                                                trade_id = 2,
+                                                leg_id =  5,
+                                                weight = 0.5)
+        self.valid_trade2 = TradeInstruction(ticker = 'TSLA',
+                                                order_type = OrderType.MARKET,
+                                                action = Action.LONG,
+                                                trade_id = 2,
+                                                leg_id =  6,
+                                                weight = 0.5)
+        self.valid_trade_instructions = [self.valid_trade1,self.valid_trade2]
+                        
+        signal_event = SignalEvent(1651500000, 10000,self.valid_trade_instructions)
+
+        self.performance_manager.update_signals(signal_event)
+
+        # Trades
+        self.trades = [
+            Trade(timestamp=1640995200, trade_id=1, leg_id=1, ticker='XYZ', quantity=10, price=10, cost=-100,fees=10, action=Action.LONG.value),
+            Trade(timestamp=1641081600, trade_id=1, leg_id=1, ticker='XYZ', quantity=-10, price=15, cost=150, fees=10,action=Action.SELL.value),
+            Trade(timestamp=1640995200, trade_id=2, leg_id=1, ticker='HEJ4', quantity=-10, price=20, cost=500, fees=10,action=Action.SHORT.value),
+            Trade(timestamp=1641081600, trade_id=2, leg_id=1, ticker='HEJ4', quantity=10, price=18, cost=-180, fees=10,  action=Action.COVER.value)
+        ]
+
+        for trade in self.trades:
+            self.performance_manager.update_trades(trade)
+
+        # Equity Curve
+        self.performance_manager.equity_value = [
+            EquityDetails(timestamp='2022-01-01 09:30', equity_value=1000.0),  # Initial equity
+            EquityDetails(timestamp='2022-01-01 16:00', equity_value=1000.0),  # No change, trades open
+            EquityDetails(timestamp='2022-01-02 09:30', equity_value=1030.0),  # Reflecting Trade 1 PnL
+            EquityDetails(timestamp='2022-01-02 12:00', equity_value=1330.0),  # Reflecting Trade 2 PnL
+            EquityDetails(timestamp='2022-01-02 16:00', equity_value=1330.0),  # No additional trades
+            EquityDetails(timestamp='2022-01-03 09:30', equity_value=1330.0),  # Assuming no further trades
+            EquityDetails(timestamp='2022-01-03 11:00', equity_value=1330.0),
+            EquityDetails(timestamp='2022-01-03 16:00', equity_value=1330.0)
+        ]
+
+
+        # Benchmark Curve
+        self.mock_benchmark_data = [
+            {'timestamp': '2022-01-01', 'close': 2000.0},
+            {'timestamp': '2022-01-02', 'close': 2010.0},
+            {'timestamp': '2022-01-03', 'close': 2030.0},
+        ]
+
+        # Mock the get_benchmark_data method to return the mock benchmark data
+        self.mock_db_client.get_benchmark_data.return_value = self.mock_benchmark_data
+        self.performance_manager.calculate_statistics()
+
+        # Test 
+        self.performance_manager.create_backtest()
+        backtest = self.performance_manager.backtest
+
+        self.assertEqual(backtest.parameters, self.mock_parameters.to_dict())
+        self.assertEqual(backtest.signal_data, [signal_event.to_dict()])
+        self.assertEqual(backtest.trade_data , [trade.to_dict() for trade in self.trades])
+
+        expected_static_keys = {
+                                'net_profit', 
+                                'total_return', 
+                                'max_drawdown', 
+                                'annual_standard_deviation', 
+                                'ending_equity', 
+                                'total_fees',
+                                'total_trades', 
+                                'num_winning_trades', 
+                                'num_lossing_trades',
+                                'avg_win_percent', 
+                                'avg_loss_percent', 
+                                'percent_profitable', 
+                                'profit_and_loss', 
+                                'profit_factor', 
+                                'avg_trade_profit',
+                                'sharpe_ratio', 
+                                'sortino_ratio', 
+                                'alpha', 
+                                'beta'
+        }
+        actual_static_keys = set(backtest.static_stats[0].keys())
+        self.assertEqual(actual_static_keys, expected_static_keys, "Static stats keys do not match expected keys.")
+
+        expected_timeseries_keys = {'timestamp', 'equity_value','daily_return', 'cumulative_return', 'drawdown'}  # Adjust based on your actual expected output
+        actual_timeseries_keys = set(backtest.timeseries_stats[0].keys())
+        self.assertEqual(actual_timeseries_keys, expected_timeseries_keys, "Timeseries stats keys do not match expected keys.")
+
 
 if __name__ == "__main__":
     unittest.main()

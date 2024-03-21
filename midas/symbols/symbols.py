@@ -1,8 +1,7 @@
-import uuid
 from enum import Enum
-from dataclasses import dataclass, field
-from ibapi.contract import Contract
 from typing import Optional
+from ibapi.contract import Contract
+from dataclasses import dataclass, field
 
 class Currency(Enum):
     USD = "USD"

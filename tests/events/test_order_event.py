@@ -1,7 +1,7 @@
 import  unittest
+from datetime import datetime
 from ibapi.order import Order
 from ibapi.contract import Contract
-from datetime import datetime
 
 from midas.events import Action, OrderType, BaseOrder, MarketOrder, LimitOrder, StopLoss, OrderEvent
 
@@ -379,7 +379,7 @@ class TestOrderEvent(unittest.TestCase):
         self.valid_action = Action.LONG
         self.valid_trade_id = 2
         self.valid_leg_id =  6
-        self.valid_order = Order()
+        self.valid_order = MarketOrder(self.valid_action, 10 )
         self.valid_contract = Contract()
 
     # Basic Validation                
@@ -446,7 +446,7 @@ class TestOrderEvent(unittest.TestCase):
                            contract="self.valid_contract")
             
     def test_order_type_valdiation(self):
-        with self.assertRaisesRegex(TypeError, "'order' must be of type Order."):
+        with self.assertRaisesRegex(TypeError, "'order' must be of type BaseOrder."):
             OrderEvent(timestamp=self.valid_timestamp,
                            trade_id=self.valid_trade_id,
                            leg_id=self.valid_leg_id,

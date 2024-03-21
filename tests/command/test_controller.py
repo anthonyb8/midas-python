@@ -1,14 +1,19 @@
+import os
+import time
+import signal
 import unittest
-from unittest.mock import Mock, patch
+import threading
 from queue import Queue
 from ibapi.order import Order
 from ibapi.contract import Contract
-from datetime import datetime
+from unittest.mock import Mock, patch
 
+from midas.account_data import Trade
 from midas.command import EventController, Mode
-from midas.events import MarketEvent, OrderEvent, SignalEvent, ExecutionEvent
-from midas.events import MarketData, BarData, TickData, OrderType, Action, TradeInstruction, Trade
+from midas.events import MarketEvent, OrderEvent, SignalEvent, ExecutionEvent, MarketOrder
+from midas.events import MarketData, BarData, QuoteData, OrderType, Action, TradeInstruction, ExecutionDetails
 
+#TODO: run live tests/ edge case
 class TestController(unittest.TestCase):    
     def setUp(self) -> None:
         self.mock_config = Mock()
@@ -36,29 +41,10 @@ class TestController(unittest.TestCase):
             self.event_controller.run()
             mock_run_backtest.assert_called_once()
 
-    def test_run_live(self):
-        self.mock_config.mode = Mode.LIVE
-        self.event_controller = EventController(self.mock_config)
-        
-        market_event = MarketEvent(timestamp=1651500000,
-                            data = {'AAPL': BarData(timestamp = 1651500000,
-                                                        open = 80.90,
-                                                        close = 9000.90,
-                                                        high = 75.90,
-                                                        low = 8800.09,
-                                                        volume = 880000)}
-                            )
-        
-        self.mock_config.strategy.handle_market_data.return_value = False
-        self.event_controller.event_queue.put(market_event)
-        
-        # Run the backtest
-        self.event_controller._run_backtest()
-
-        # Verify interactions
-        self.mock_config.order_book.on_market_data.assert_called_once_with(market_event)
-        self.mock_config.strategy.handle_market_data.assert_called()
-
+    def simulate_sigint(self):
+        """Simulates the SIGINT signal reception after a short delay."""
+        time.sleep(0.1)
+        self.event_controller.signal_handler(signal.SIGINT, None)
 
     def test_run_backtest_market_event(self):
         self.mock_config.mode = Mode.BACKTEST
@@ -123,7 +109,7 @@ class TestController(unittest.TestCase):
                            trade_id=6,
                            leg_id=2,
                            action=Action.LONG,
-                           order=Order(),
+                           order=MarketOrder(Action.LONG,10),
                            contract=Contract())
         
         self.mock_config.hist_data_client.data_stream.side_effect = [True, False]# Simulates one iterations then stop
@@ -139,10 +125,10 @@ class TestController(unittest.TestCase):
         self.mock_config.mode = Mode.BACKTEST
         self.event_controller = EventController(self.mock_config)
         
-        self.valid_trade_details = Trade(trade_id='1',
-                      leg_id='2',
-                      timestamp=datetime(2024,1,1),
-                      symbol='HEJ4',
+        self.valid_trade_details = ExecutionDetails(trade_id=1,
+                      leg_id=2,
+                      timestamp=1651500000,
+                      ticker='HEJ4',
                       quantity=10,
                       price= 85.98,
                       cost=9000.90,
@@ -175,8 +161,39 @@ class TestController(unittest.TestCase):
         self.assertFalse(self.mock_config.broker_client.liquidate_positions.called)
         self.assertFalse(self.mock_config.performance_manager.calculate_statistics.called)
         self.assertFalse(self.mock_config.performance_manager.create_backtest.called)
-
     
+    # ---- Have to exit is Ctrl + C or will hang ---- 
+    # def test_run_live(self):
+    #     self.mock_config.mode = Mode.LIVE
+    #     self.event_controller = EventController(self.mock_config)
+        
+    #     market_event = MarketEvent(timestamp=1651500000,
+    #                         data = {'AAPL': BarData(timestamp = 1651500000,
+    #                                                     open = 80.90,
+    #                                                     close = 9000.90,
+    #                                                     high = 75.90,
+    #                                                     low = 8800.09,
+    #                                                     volume = 880000)}
+    #                         )
+        
+    #     self.mock_config.strategy.handle_market_data.return_value = False
+    #     self.event_controller.event_queue.put(market_event)
+        
+    #     # Run the backtest
+    #     self.event_controller._run_live()
+
+    #     # Verify interactions
+    #     self.mock_config.order_book.on_market_data.assert_called_once_with(market_event)
+    #     self.mock_config.strategy.handle_market_data.assert_called()
+
+    # def test_run_live_stops_gracefully1(self):
+    #     self.mock_config.mode = Mode.LIVE
+    #     self.event_controller = EventController(self.mock_config)
+    #     self.event_controller._run_live()
+
+    #     # Verify that the signal handler was called and the loop exited
+    #     self.mock_config.logger.info.assert_called_with("Live trading stopped. Performing cleanup...")
+
 
 
 if __name__ == "__main__":

@@ -1,9 +1,8 @@
+import logging
 from .data_client import DataClient
 from ibapi.contract import Contract
-import logging
 
 class ContractManager:
-
     def __init__(self, client_instance: DataClient, logger:logging.Logger):
         self.logger = logger
         self.client = client_instance

@@ -76,7 +76,7 @@ class BrokerClient():
             raise ValueError("'event' must be of type OrderEvent instance.")
         
         contract = event.contract
-        order = event.order
+        order = event.order.order
         self.handle_order(contract,order) 
 
     def handle_order(self, contract:Contract, order:Order):

@@ -1,13 +1,14 @@
 import unittest
 from unittest.mock import Mock
 from unittest.mock import patch
-from ibapi.order import Order
 from ibapi.contract import Contract
 
 from midas.order_manager import OrderManager
-from midas.symbols import Equity,SecType,Currency,Exchange, Future
+from midas.symbols.symbols import Equity, Currency,Exchange, Future
 from midas.events import BarData, MarketEvent, SignalEvent, TradeInstruction, MarketOrder, LimitOrder, StopLoss
 from midas.events import  SignalEvent, MarketEvent, OrderEvent, TradeInstruction, Action, OrderType
+
+# TODO : Edge Cases
 
 class TestOrderManager(unittest.TestCase):
     def setUp(self) -> None:
@@ -211,7 +212,7 @@ class TestOrderManager(unittest.TestCase):
         self.valid_action = Action.LONG
         self.valid_trade_id = 2
         self.valid_leg_id =  6
-        self.valid_order = Order()
+        self.valid_order = MarketOrder(action=self.valid_action, quantity=10)
         self.valid_contract = Contract()
 
         # Test
@@ -242,8 +243,7 @@ class TestOrderManager(unittest.TestCase):
         # Test
         with self.assertRaisesRegex(RuntimeError,"Failed to create or queue SignalEvent due to input error"):
             self.order_manager._create_order(order_type=OrderType.MARKET, action='LONG', quantity=quantity)
-        
-    # Edge Cases
+
 
 if __name__ == "__main__":
     unittest.main()

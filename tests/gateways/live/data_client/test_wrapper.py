@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from midas.gateways.live.data_client.wrapper import DataApp  # Adjust the import according to your project structure
 from midas.events import BarData, MarketEvent
+from midas.gateways.live.data_client.wrapper import DataApp
 
+# TODO: edge cases
 class TestDataApp(unittest.TestCase):
     def setUp(self):
         self.mock_event_queue = Mock()
@@ -67,8 +68,6 @@ class TestDataApp(unittest.TestCase):
         self.data_app.realtimeBar(reqId, time, open, high, low, close, volume, wap, count)
         self.mock_event_queue.put.assert_called_once_with(MarketEvent(timestamp=time, data={'AAPL':valid_bar}))
         self.assertEqual(self.data_app.current_bar_data, {})
-
-# Add more test cases as needed for other methods
 
 if __name__ == '__main__':
     unittest.main()

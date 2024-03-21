@@ -1,11 +1,11 @@
 import unittest
-from unittest.mock import Mock, patch
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
+from unittest.mock import Mock, patch
 
 from midas.performance.statistics import PerformanceStatistics
 
+# TODO: edge cases
 class TestPerformancStatistics(unittest.TestCase):    
     def setUp(self):
         # Sample equity curve and trade log for testing
@@ -13,8 +13,8 @@ class TestPerformancStatistics(unittest.TestCase):
         self.benchmark_equity_curve = np.array([100, 103, 102, 106, 108])
         
         self.trade_log = pd.DataFrame({
-            'net_gain/loss': [20, -10, 15, -5, 30, -20],
-            'gain/loss (%)': [10, -5, 7.5, -2.5, 15, -10]
+            'pnl': [20, -10, 15, -5, 30, -20],
+            'gain/loss': [0.10, -0.05, 0.075, -0.25, 0.15, -0.010]
         })
     
     # Net Profit
@@ -34,7 +34,7 @@ class TestPerformancStatistics(unittest.TestCase):
 
     def test_net_profit_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
+        trade_log = pd.DataFrame({'pnl': []})
         self.assertEqual(PerformanceStatistics.net_profit(trade_log), 0)
 
     # Daily Return
@@ -167,7 +167,7 @@ class TestPerformancStatistics(unittest.TestCase):
 
     def test_total_winning_trades_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
+        trade_log = pd.DataFrame({'pnl': []})
         self.assertEqual(PerformanceStatistics.total_winning_trades(trade_log), 0)
     
     # Total Losing Trades
@@ -187,88 +187,88 @@ class TestPerformancStatistics(unittest.TestCase):
 
     def test_total_losing_trades_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
+        trade_log = pd.DataFrame({'pnl': []})
         self.assertEqual(PerformanceStatistics.total_losing_trades(trade_log), 0)
     
     # Total Avg Win Percent
-    def test_avg_win_percent(self):
-        expected_avg_win = 10.8333  # Based on the provided gain/loss (%) values
-        avg_win_percent = PerformanceStatistics.avg_win_percent(self.trade_log)
-        self.assertAlmostEqual(avg_win_percent, expected_avg_win, places=4)
+    def test_avg_win_return_rate(self):
+        expected_avg_win = 0.108333  # Based on the provided gain/loss values
+        avg_win_return_rate = PerformanceStatistics.avg_win_return_rate(self.trade_log)
+        self.assertAlmostEqual(avg_win_return_rate, expected_avg_win, places=4)
 
-    def test_avg_win_percent_type_check(self):        
+    def test_avg_win_return_rate_type_check(self):        
         # Test with incorrect type (should raise an error or handle gracefully)
         with self.assertRaises(TypeError):
-            PerformanceStatistics.avg_win_percent([10, -5, 15])
+            PerformanceStatistics.avg_win_return_rate([10, -5, 15])
 
         # Test with missing column
         with self.assertRaises(ValueError):
-            PerformanceStatistics.avg_win_percent(pd.DataFrame())
+            PerformanceStatistics.avg_win_return_rate(pd.DataFrame())
 
-    def test_avg_win_percent_null_handling(self):
+    def test_avg_win_return_rate_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
-        self.assertEqual(PerformanceStatistics.avg_win_percent(trade_log), 0)
+        trade_log = pd.DataFrame({'pnl': []})
+        self.assertEqual(PerformanceStatistics.avg_win_return_rate(trade_log), 0)
     
-    # Total Avg Loss Percent
-    def test_avg_loss_percent(self):
-        expected_avg_loss = -5.8333  # Based on the provided gain/loss (%) values
-        avg_loss_percent = PerformanceStatistics.avg_loss_percent(self.trade_log)
-        self.assertAlmostEqual(avg_loss_percent, expected_avg_loss, places=4)
+    # Total avg_loss_return_rate
+    def test_avg_loss_return_rate(self):
+        expected_avg_loss = -0.10333  # Based on the provided gain/loss values
+        avg_loss_return_rate = PerformanceStatistics.avg_loss_return_rate(self.trade_log)
+        self.assertAlmostEqual(avg_loss_return_rate, expected_avg_loss, places=4)
 
-    def test_avg_loss_percent_type_check(self):        
+    def test_avg_loss_return_rate_type_check(self):        
         # Test with incorrect type (should raise an error or handle gracefully)
         with self.assertRaises(TypeError):
-            PerformanceStatistics.avg_loss_percent([10, -5, 15])
+            PerformanceStatistics.avg_loss_return_rate([10, -5, 15])
 
         # Test with missing column
         with self.assertRaises(ValueError):
-            PerformanceStatistics.avg_loss_percent(pd.DataFrame())
+            PerformanceStatistics.avg_loss_return_rate(pd.DataFrame())
 
-    def test_avg_loss_percent_null_handling(self):
+    def test_avg_loss_return_rate_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
-        self.assertEqual(PerformanceStatistics.avg_loss_percent(trade_log), 0)
+        trade_log = pd.DataFrame({'pnl': []})
+        self.assertEqual(PerformanceStatistics.avg_loss_return_rate(trade_log), 0)
 
     # Percent Profitable
-    def test_percent_profitable(self):
-        expected_percent_profitable = 50.0  # 3 winning trades out of 6 total trades
-        percent_profitable = PerformanceStatistics.percent_profitable(self.trade_log)
-        self.assertEqual(percent_profitable, expected_percent_profitable)
+    def test_profitability_ratio(self):
+        expected_profitability_ratio = 0.50  # 3 winning trades out of 6 total trades
+        profitability_ratio = PerformanceStatistics.profitability_ratio(self.trade_log)
+        self.assertEqual(profitability_ratio, expected_profitability_ratio)
 
-    def test_percent_profitable_type_check(self):        
+    def test_profitability_ratio_type_check(self):        
         # Test with incorrect type (should raise an error or handle gracefully)
         with self.assertRaises(TypeError):
-            PerformanceStatistics.percent_profitable([10, -5, 15])
+            PerformanceStatistics.profitability_ratio([10, -5, 15])
 
         # Test with missing column
         with self.assertRaises(ValueError):
-            PerformanceStatistics.percent_profitable(pd.DataFrame())
+            PerformanceStatistics.profitability_ratio(pd.DataFrame())
 
-    def test_percent_profitable_null_handling(self):
+    def test_profitability_ratio_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
-        self.assertEqual(PerformanceStatistics.percent_profitable(trade_log), 0)
+        trade_log = pd.DataFrame({'pnl': []})
+        self.assertEqual(PerformanceStatistics.profitability_ratio(trade_log), 0)
 
     # Avg Trade Profit
-    def test_average_trade_profit(self):
+    def test_avg_trade_profit(self):
         expected_avg_trade_profit = 5  # (20-10+15-5+30-20) / 6
-        average_trade_profit = PerformanceStatistics.average_trade_profit(self.trade_log)
+        average_trade_profit = PerformanceStatistics.avg_trade_profit(self.trade_log)
         self.assertEqual(average_trade_profit, expected_avg_trade_profit)
 
-    def test_average_trade_profit_type_check(self):        
+    def test_avg_trade_profit_type_check(self):        
         # Test with incorrect type (should raise an error or handle gracefully)
         with self.assertRaises(TypeError):
-            PerformanceStatistics.average_trade_profit([10, -5, 15])
+            PerformanceStatistics.avg_trade_profit([10, -5, 15])
 
         # Test with missing column
         with self.assertRaises(ValueError):
-            PerformanceStatistics.average_trade_profit(pd.DataFrame())
+            PerformanceStatistics.avg_trade_profit(pd.DataFrame())
 
-    def test_average_trade_profit_null_handling(self):
+    def test_avg_trade_profit_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
-        self.assertEqual(PerformanceStatistics.average_trade_profit(trade_log), 0)
+        trade_log = pd.DataFrame({'pnl': []})
+        self.assertEqual(PerformanceStatistics.avg_trade_profit(trade_log), 0)
 
     # Profit Factor
     def test_profit_factor(self):
@@ -287,7 +287,7 @@ class TestPerformancStatistics(unittest.TestCase):
 
     def test_profit_factor_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
+        trade_log = pd.DataFrame({'pnl': []})
         self.assertEqual(PerformanceStatistics.profit_factor(trade_log), 0)
 
     # Profit & Loss Ratio
@@ -307,7 +307,7 @@ class TestPerformancStatistics(unittest.TestCase):
 
     def test_profit_and_loss_ratio_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
+        trade_log = pd.DataFrame({'pnl': []})
         self.assertEqual(PerformanceStatistics.profit_and_loss_ratio(trade_log), 0)
 
    # Sharpe Ratio
@@ -335,8 +335,8 @@ class TestPerformancStatistics(unittest.TestCase):
    # Sortino Ratio
     def test_sortino_ratio(self):
         target_return = 0
-        negative_returns = self.trade_log[self.trade_log['gain/loss (%)'] < target_return]['gain/loss (%)'] # Filter for negative returns
-        expected_return = self.trade_log['gain/loss (%)'].mean() # Calculate expected return as average return since target return is 0
+        negative_returns = self.trade_log[self.trade_log['gain/loss'] < target_return]['gain/loss'] # Filter for negative returns
+        expected_return = self.trade_log['gain/loss'].mean() # Calculate expected return as average return since target return is 0
         downside_deviation = negative_returns.std(ddof=1) # Calculate downside deviation (standard deviation of negative returns)
         # Calculate expected Sortino ratio
         if downside_deviation > 0:
@@ -358,7 +358,7 @@ class TestPerformancStatistics(unittest.TestCase):
 
     def test_sortino_ratio_null_handling(self):
         # Test with empty DataFrame
-        trade_log = pd.DataFrame({'net_gain/loss': []})
+        trade_log = pd.DataFrame({'gain/loss': []})
         self.assertEqual(PerformanceStatistics.sortino_ratio(trade_log), 0)
 
     # Beta

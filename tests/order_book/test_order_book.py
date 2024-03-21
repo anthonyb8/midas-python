@@ -1,7 +1,7 @@
 import unittest
 
-from midas.events import BarData, QuoteData, MarketDataType, MarketEvent, MarketData
 from midas.order_book import OrderBook
+from midas.events import BarData, QuoteData, MarketDataType, MarketEvent, MarketData
 
 #TODO: edge cases / orderbook depth 
 

@@ -1,12 +1,12 @@
 # client.py
+import logging
 import threading
-import logging
 from queue import Queue
-from .wrapper import DataApp
-import logging
-from ibapi.contract import Contract
-from midas.events import MarketDataType
 from decouple import config
+from ibapi.contract import Contract
+
+from .wrapper import DataApp
+from midas.events import MarketDataType
 
 
 class DataClient:
@@ -67,8 +67,8 @@ class DataClient:
             self.app.reqRealTimeBars(reqId=reqId, contract=contract, barSize=5, whatToShow='TRADES', useRTH=False, realTimeBarsOptions=[])
             self.app.reqId_to_symbol_map[reqId] = contract.symbol
             self.logger.info(f"Started 5 sec bar data stream for {contract}.")
-        
-        self.logger.error(f"Data stream already established for {contract}.")
+        else:
+            self.logger.error(f"Data stream already established for {contract}.")
 
     def cancel_all_bar_data(self):
         # Cancel real time bars for all reqId ** May not all be on bar data ** 

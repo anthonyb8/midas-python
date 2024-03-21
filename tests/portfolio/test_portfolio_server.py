@@ -1,12 +1,12 @@
 import unittest
-from unittest.mock import patch, Mock
-from ibapi.contract import Contract
 from ibapi.order import Order
+from ibapi.contract import Contract
+from unittest.mock import patch, Mock
 
-from midas.portfolio import PortfolioServer
-from midas.symbols import Future, Equity, Currency, Exchange
-from midas.account_data import Position, AccountDetails, ActiveOrder
 from midas.events import Action
+from midas.portfolio import PortfolioServer
+from midas.account_data import Position, AccountDetails, ActiveOrder
+from midas.symbols.symbols import Future, Equity, Currency, Exchange
 
 #TODO: edge cases, integration
 

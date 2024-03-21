@@ -7,7 +7,7 @@ from midas.command import MidasShell, EventController, Mode
 ### Development
 def main():
     # Set the mode (LIVE or BACKTEST)
-    mode = Mode.LIVE
+    mode = Mode.BACKTEST
     # Initialize the strategy configuration
     strategy_config = CointegrationzscoreConfig(mode)
 
@@ -19,6 +19,6 @@ if __name__ == "__main__":
     main()
 
 
-### Production 
+# ## Production 
 # if __name__ == '__main__':
 #     MidasShell().cmdloop()

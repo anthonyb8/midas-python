@@ -1,10 +1,9 @@
-from dataclasses import dataclass, field
-from typing import List, Literal
 from datetime import datetime
+from typing import List, Literal
+from dataclasses import dataclass, field
 
-from midas.events import MarketDataType
 from midas.symbols import Symbol
-
+from midas.events import MarketDataType
 
 @dataclass
 class Parameters:
@@ -14,7 +13,6 @@ class Parameters:
     test_start: str 
     test_end: str 
     missing_values_strategy : Literal['drop', 'fill_forward'] = 'fill_forward'
-    strategy_allocation: float = 1.0
     symbols: List[Symbol] = field(default_factory=list)
     train_end: str = None
     train_start: str = None
@@ -57,9 +55,6 @@ class Parameters:
 
         if self.capital <= 0:
             raise ValueError(f"'capital' must be greater than zero")
-
-        if self.strategy_allocation <= 0:
-            raise ValueError(f"'strategy_allocation' must be greater than zero")
         
         if self.train_start is not None and self.train_end is not None:
             train_start_date = datetime.strptime(self.train_start, '%Y-%m-%d')
@@ -86,7 +81,6 @@ class Parameters:
             "strategy_name": self.strategy_name, 
             "capital": self.capital, 
             "data_type": self.data_type.value, 
-            "strategy_allocation": self.strategy_allocation, 
             "train_start": self.train_start, 
             "train_end": self.train_end, 
             "test_start": self.test_start,

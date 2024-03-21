@@ -1,26 +1,14 @@
-from queue import Queue
-from typing import Dict, Union, TypedDict, Union, Optional
-from ibapi.contract import Contract
-from ibapi.order import Order
 import logging
+from queue import Queue
+from ibapi.order import Order
 from datetime import datetime
+from ibapi.contract import Contract
+from typing import Dict, Union, TypedDict, Union, Optional
 
 from midas.order_book import OrderBook
-from midas.events import ExecutionEvent, Action, BaseOrder, TradeInstruction
+from midas.symbols.symbols import Symbol, Future, Equity
 from midas.account_data import AccountDetails,  EquityDetails
-from midas.symbols import Symbol, Future, Equity
-
-
-class ExecutionDetails(TypedDict):
-    timestamp: Union[int,float]
-    trade_id: int
-    leg_id: int
-    symbol: str
-    quantity: int
-    price: float
-    cost: float
-    action: str
-    fees: float
+from midas.events import ExecutionEvent, Action, BaseOrder, TradeInstruction, ExecutionDetails
 
 class PositionDetails(TypedDict):
     action: str
@@ -59,7 +47,7 @@ class DummyBroker:
         self._update_account(contract, action, quantity, fill_price,commission_fees)
 
         # Create Execution Events
-        trade_details = self._update_trades(timestamp, trade_id, leg_id, contract, quantity, fill_price, commission_fees)
+        trade_details = self._update_trades(timestamp, trade_id, leg_id, contract, quantity, action, fill_price, commission_fees)
         self._set_execution(timestamp, trade_details, action, contract)
 
     def _fill_price(self, contract: Contract, action:Action):
@@ -240,7 +228,7 @@ class DummyBroker:
     def _equity_position_value(self, position:PositionDetails, current_price:float):
         return (current_price * position['multiplier']) * position['quantity'] 
     
-    def _update_trades(self, timestamp: Union[int,float], trade_id:int, leg_id:int, contract:Contract, quantity: float,action: Action, fill_price:float, fees:float):
+    def _update_trades(self, timestamp: Union[int,float], trade_id:int, leg_id:int, contract:Contract, quantity: float, action: Action, fill_price:float, fees:float):
         trade = ExecutionDetails(
             timestamp = timestamp,
             trade_id = trade_id,
@@ -318,7 +306,7 @@ class DummyBroker:
 
             self.last_trade[contract] = trade
 
-        self.logger.info(self.last_trade)
+        self.logger.info(f"\nPositions liquidate: \n{self.last_trade}\n")
     
     # Return functions to mimic data return from broker
     def return_positions(self):
@@ -327,9 +315,9 @@ class DummyBroker:
     def return_account(self):
         return self.account
     
-    def return_executed_trades(self, ticker: str = None):
-        if ticker:
-            return self.last_trade[ticker]
+    def return_executed_trades(self, contract:Contract = None):
+        if contract:
+            return self.last_trade[contract]
         else:
             return self.last_trade
 

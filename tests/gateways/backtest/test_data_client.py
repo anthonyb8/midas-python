@@ -1,12 +1,12 @@
 import unittest
-from unittest.mock import Mock
-from queue import Queue
 import pandas as pd
-from pandas.testing import assert_frame_equal
+from queue import Queue
 from datetime import datetime
+from unittest.mock import Mock
+from pandas.testing import assert_frame_equal
 
-from midas.gateways.backtest import DataClient
 from midas.events import MarketEvent, BarData
+from midas.gateways.backtest import DataClient
 
 #TODO: edge cases
 

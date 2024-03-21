@@ -1,10 +1,12 @@
 from datetime import datetime
+import signal
 from .config import Config, Mode
 from midas.events import MarketEvent, OrderEvent, SignalEvent, ExecutionEvent
 
 
 class EventController:
     def __init__(self, config:Config):
+        # self.running = None
         # Initialize instance variables
         self.event_queue = config.event_queue
         self.mode = config.mode
@@ -29,9 +31,17 @@ class EventController:
             self._run_live()
         elif self.mode == Mode.BACKTEST:
             self._run_backtest()
+
+    def signal_handler(self, signum, frame):
+        """Handles termination signals to allow for a graceful shutdown."""
+        self.logger.info("Signal received, preparing to shut down.")
+        self.running = False  # Clear the flag to stop the loop
   
     def _run_live(self):
-        while True:
+        self.running = True  # Flag to control the loop
+        signal.signal(signal.SIGINT, self.signal_handler)  # Register signal handler
+
+        while self.running:
             while not self.event_queue.empty():
                 event = self.event_queue.get()
                 self.logger.info(event)
@@ -45,6 +55,9 @@ class EventController:
 
                 elif isinstance(event, OrderEvent):
                     self.broker_client.on_order(event)
+
+        # Perform cleanup here
+        self.logger.info("Live trading stopped. Performing cleanup...")
           
     def _run_backtest(self):
         current_day = None  # Variable to track the current day
@@ -78,8 +91,10 @@ class EventController:
 
                 elif isinstance(event, ExecutionEvent):
                     self.broker_client.on_execution(event)
-
+        
         # Perform EOD operations for the last trading day
+        self.logger.info("Backtest complete. Finalizing results ...")
+        
         if current_day is not None:
             self.broker_client.eod_update()
             self.broker_client.liquidate_positions()

@@ -1,9 +1,8 @@
-from typing  import  Any, Union
-from datetime import datetime
-from dataclasses import dataclass, field
 from enum import Enum 
 from ibapi.order import Order
+from typing  import  Any, Union
 from ibapi.contract import Contract
+from dataclasses import dataclass, field
 
 class Action(Enum):
     """ Long and short are treated as entry actions and short/cover are treated as exit actions. """
@@ -88,7 +87,7 @@ class OrderEvent:
     leg_id: int
     action: Action
     contract: Contract 
-    order: Order  
+    order: BaseOrder  
     type: str = field(init=False, default='ORDER')
 
     def __post_init__(self):
@@ -103,10 +102,10 @@ class OrderEvent:
             raise TypeError("'action' must be of type Action enum.")
         if not isinstance(self.contract, Contract):
             raise TypeError("'contract' must be of type Contract.")
-        if not isinstance(self.order, Order):
-            raise TypeError("'order' must be of type Order.")
+        if not isinstance(self.order, BaseOrder):
+            raise TypeError("'order' must be of type BaseOrder.")
 
     def __str__(self) -> str:
-        string = f"\n{self.type} : \n Timestamp: {self.timestamp}\n Trade Instructions: {self.trade_instructions.__dict__}\n Contract: {self.contract}\n Order: {self.order.__dict__}\n"
+        string = f"\n{self.type} : \n Timestamp: {self.timestamp}\n Trade ID: {self.trade_id}\n Leg ID: {self.leg_id}\n Action: {self.action}\n Contract: {self.contract}\n Order: {self.order.__dict__}\n"
         return string
     

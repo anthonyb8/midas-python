@@ -1,8 +1,11 @@
 import cmd
 import os
-from datetime import datetime
 import importlib
 import subprocess
+import webbrowser
+from datetime import datetime
+from decouple import config
+
 from .controller import EventController, Mode
 
 class WelcomeMessage:
@@ -101,15 +104,24 @@ class MidasShell(cmd.Cmd):
         event_driver.run()
 
     def do_dashboard(self, arg):
-        '''Deploy the trading dashboard'''
-        script_dir = os.path.dirname(os.path.realpath(__file__))
-        parent_dir = os.path.dirname(script_dir)
-        dashboard_path = os.path.join(parent_dir, 'tools/dashboard')
-        print(dashboard_path)
-        # Serve the React app
-        print("Deploying dashboard...")
-        self.dashboard_process = subprocess.Popen(["serve", "-s", "build"], cwd=dashboard_path)
-        print("Dashboard is deployed and running...")
+        '''Open the trading dashboard in a web browser.'''
+        # URL of the dashboard hosted on Vercel
+        dashboard_url = config('MIDAS_DASHBOARD_URL')  # Replace with your actual dashboard URL
+        
+        print("Opening dashboard...")
+        # Open the URL in the default browser
+        webbrowser.open(dashboard_url, new=2)  # new=2 opens in a new tab, if possible
+        print("Dashboard should now be open in your browser.")
+
+        # '''Deploy the trading dashboard'''
+        # script_dir = os.path.dirname(os.path.realpath(__file__))
+        # parent_dir = os.path.dirname(script_dir)
+        # dashboard_path = os.path.join(parent_dir, 'tools/dashboard')
+        # print(dashboard_path)
+        # # Serve the React app
+        # print("Deploying dashboard...")
+        # self.dashboard_process = subprocess.Popen(["serve", "-s", "build"], cwd=dashboard_path)
+        # print("Dashboard is deployed and running...")
 
     def do_stop_dashboard(self, arg):
         '''Stop the deployed trading dashboard'''

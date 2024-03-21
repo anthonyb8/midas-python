@@ -1,12 +1,13 @@
 import unittest
-from unittest.mock import Mock, patch
-from ibapi.contract import Contract
-from ibapi.order import Order
 from decouple import config
+from ibapi.order import Order
+from ibapi.contract import Contract
+from unittest.mock import Mock, patch
 
 from midas.gateways.live import DataClient
 from midas.events import OrderEvent, ExecutionEvent, Action, MarketDataType
 
+#TODO: edge cases
 
 class TestDataClient(unittest.TestCase):
     def setUp(self):
@@ -134,12 +135,6 @@ class TestDataClient(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError,"'data_type' must be of type MarketDataType enum."):
             self.data_client.get_data(data_type, contract)
-
-            
-    # Edge Cases
-            
-            
-    # Integration
         
 
 if __name__ == '__main__':

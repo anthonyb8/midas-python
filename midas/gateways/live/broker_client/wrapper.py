@@ -1,14 +1,18 @@
-
 import os
 import logging
 import threading
+from decimal import Decimal
 from datetime import datetime
-from typing import get_type_hints
+from ibapi.order import Order
 from ibapi.client import EClient
+from typing import get_type_hints
 from ibapi.wrapper import EWrapper
+from ibapi.order_state import OrderState
+from ibapi.contract import Contract, ContractDetails
+
 from midas.portfolio import PortfolioServer
 from midas.performance import PerformanceManager
-from midas.account_data import ActiveOrder, Position 
+from midas.account_data import ActiveOrder, Position, Trade
 from midas.account_data import Position,ActiveOrder, AccountDetails, EquityDetails
 
 class BrokerApp(EWrapper, EClient):
@@ -36,7 +40,7 @@ class BrokerApp(EWrapper, EClient):
         # Thread Locks
         self.next_valid_order_id_lock = threading.Lock()
 
-    def error(self, reqId, errorCode, errorString):
+    def error(self, reqId:int, errorCode:int, errorString:str, advancedOrderRejectJson:str=None):
         super().error(reqId, errorCode, errorString)
         if errorCode == 502: # Error for wrong port
             self.logger.critical(f"Port Error : {errorCode} incorrect port entered.")
@@ -58,7 +62,7 @@ class BrokerApp(EWrapper, EClient):
         self.logger.info('Closed Broker Connection.')
 
     #### wrapper function for reqIds() -> This function manages the Order ID.
-    def nextValidId(self, orderId):
+    def nextValidId(self, orderId:int):
         super().nextValidId(orderId)
         with self.next_valid_order_id_lock:
             self.next_valid_order_id = orderId
@@ -66,15 +70,15 @@ class BrokerApp(EWrapper, EClient):
         self.logger.info(f"Next Valid Id {self.next_valid_order_id}")
         self.valid_id_event.set()
 
-    def contractDetails(self, reqId, contractDetails):
+    def contractDetails(self, reqId:int, contractDetails: ContractDetails):
         self.is_valid_contract = True
 
-    def contractDetailsEnd(self, reqId):
+    def contractDetailsEnd(self, reqId:int):
         self.logger.info(f"Contract Details Received.")
         self.validate_contract_event.set()
     
     #### wrapper function for reqAccountUpdates. returns accoutninformation whenever there is a change
-    def updateAccountValue(self, key:str, val:str, currency:str,accountName:str):
+    def updateAccountValue(self, key:str, val:str, currency:str, accountName:str):
         super().updateAccountValue(key, val, currency, accountName)
         if key in self.account_info_keys:
             if key == 'Currency':
@@ -83,25 +87,27 @@ class BrokerApp(EWrapper, EClient):
                 self.account_info[key] = float(val)
 
     #### wrapper function for reqAccountUpdates. Get position information
-    def updatePortfolio(self, contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName):
+    def updatePortfolio(self, contract:Contract, position: Decimal, marketPrice: float, marketValue:float, averageCost:float, unrealizedPNL:float, realizedPNL:float, accountName:str):
         super().updatePortfolio(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName)
-        
-        position_data = Position(
-            action="BUY" if position > 0 else "SELL",
-            avg_cost=averageCost,
-            quantity= position,
-            total_cost= abs(position) * averageCost if contract.secType =='FUT' else position * averageCost,
-            market_value=marketValue, 
-            multiplier=self.symbols_map[contract.symbol].multiplier,
-            initial_margin=self.symbols_map[contract.symbol].initialMargin
-        )
- 
-        self.portfolio_server.update_positions(contract, position_data)
+        if position == 0:
+            pass
+        else:
+            position_data = Position(
+                action="BUY" if position > 0 else "SELL",
+                avg_cost = averageCost,
+                quantity= float(position),
+                total_cost= abs(float(position)) * averageCost if contract.secType =='FUT' else float(position) * averageCost,
+                market_value=marketValue, 
+                multiplier=self.symbols_map[contract.symbol].multiplier,
+                initial_margin=self.symbols_map[contract.symbol].initialMargin
+            )
+    
+            self.portfolio_server.update_positions(contract, position_data)
 
     #### wrapper function for reqAccountUpdates. Signals the end of account information
-    def accountDownloadEnd(self, accountName):
+    def accountDownloadEnd(self, accountName:str):
         super().accountDownloadEnd(accountName)
-        
+
         # Set timestamp for account update
         self.account_info['Timestamp'] = current_time_iso = datetime.now().isoformat()
         self.portfolio_server.update_account_details(self.account_info)
@@ -109,8 +115,9 @@ class BrokerApp(EWrapper, EClient):
         self.logger.info(f"AccountDownloadEnd. Account: {accountName}")
         self.account_download_event.set()
 
-    def openOrder(self, orderId, contract, order, orderState):
+    def openOrder(self, orderId: int, contract: Contract, order: Order, orderState: OrderState):
         super().openOrder(orderId, contract, order, orderState)
+
         order_data = ActiveOrder(
             permId= order.permId,
             clientId= order.clientId, 
@@ -121,7 +128,7 @@ class BrokerApp(EWrapper, EClient):
             exchange= contract.exchange, 
             action= order.action, 
             orderType= order.orderType,
-            totalQty= order.totalQuantity, 
+            totalQty= float(order.totalQuantity), # Decimal
             cashQty= order.cashQty, 
             lmtPrice= order.lmtPrice, 
             auxPrice= order.auxPrice, 
@@ -135,7 +142,7 @@ class BrokerApp(EWrapper, EClient):
         self.open_orders_event.set()
 
     # Wrapper function for orderStatus
-    def orderStatus(self, orderId:int, status:str, filled:float, remaining:float, avgFillPrice:float, permId:int, parentId:int, lastFillPrice:float, clientId:int, whyHeld:str, mktCapPrice: float):
+    def orderStatus(self, orderId:int, status:str, filled:Decimal, remaining:Decimal, avgFillPrice:float, permId:int, parentId:int, lastFillPrice:float, clientId:int, whyHeld:str, mktCapPrice: float):
         super().orderStatus(orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice)
         self.logger.info(f"Received order status update for orderId {orderId}: {status}")
         
@@ -143,8 +150,8 @@ class BrokerApp(EWrapper, EClient):
             permId = permId,
             orderId =  orderId,
             status =  status, # Options : PendingSubmit, PendingCancel PreSubmitted, Submitted, Cancelled, Filled, Inactive 
-            filled =  filled,
-            remaining =  remaining,
+            filled =  float(filled),
+            remaining =  float(remaining),
             avgFillPrice =  avgFillPrice, 
             parentId =  parentId,
             lastFillPrice =  lastFillPrice, 
@@ -154,10 +161,11 @@ class BrokerApp(EWrapper, EClient):
 
         self.portfolio_server.update_orders(order_data)
         
-    #####   wrapper function for reqExecutions.   this function gives the executed orders                
+    ####   wrapper function for reqExecutions.   this function gives the executed orders                
     # def execDetails(self, reqId, contract, execution):
+    #     print(reqId, contract, execution)
     #     super().execDetails(reqId, contract, execution)
-    #     execution_data = ExecutionDetails(permId = execution.permId, 
+    #     execution_data = Trade(permId = execution.permId, 
     #                                 reqId = reqId,
     #                                 Symbol = contract.symbol, 
     #                                 SecType= contract.secType, 

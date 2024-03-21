@@ -1,17 +1,17 @@
 import queue
 from enum import Enum
-from decouple import config
 from typing import Union
+from decouple import config
 
 from .parameters import Parameters
-from midas.symbols import Symbol
 from midas.order_book import OrderBook
+from midas.symbols.symbols import Symbol
 from midas.strategies import BaseStrategy
-from midas.order_manager import OrderManager
+from midas.utils.logger import SystemLogger
 from midas.portfolio import PortfolioServer
+from midas.order_manager import OrderManager
 from midas.performance import PerformanceManager
 from midas.utils.database import DatabaseClient
-from midas.utils.logger import SystemLogger
 
 
 DATABASE_KEY = config('MIDAS_API_KEY')
@@ -55,11 +55,14 @@ class Config:
         self.setup()
 
     def setup(self):
-        self._initialize_components()
-
         # Map ticker to symbol object
         for symbol in self.params.symbols:
             self.map_symbol(symbol)
+
+        self.logger.info(f"Test {self.symbols_map}")
+        self._initialize_components()
+        self.logger.info("test2")
+
         
         # Load historical data if the strategy requires a train period
         if self.params.train_start:
@@ -74,16 +77,16 @@ class Config:
     def map_symbol(self, symbol: Symbol):
         self.data_ticker_map[symbol.data_ticker] = symbol.ticker
 
-        if self.mode == Mode.BACKTEST:
-            self.symbols_map[symbol.ticker] = symbol
-        elif self.mode == Mode.LIVE and self.contract_handler.validate_contract(symbol.contract):
-            self.symbols_map[symbol.ticker] = symbol
+        self.symbols_map[symbol.ticker] = symbol
+        # if self.mode == Mode.BACKTEST:
+        # elif self.mode == Mode.LIVE and self.contract_handler.validate_contract(symbol.contract):
+        #     self.symbols_map[symbol.ticker] = symbol
 
     def _initialize_components(self):
         self.order_book = OrderBook(data_type=self.params.data_type)
         self.performance_manager = PerformanceManager(self.database,self.logger, self.params)
         self.portfolio_server = PortfolioServer(self.symbols_map, self.logger)
-        self.order_manager = OrderManager(self.params.strategy_allocation, self.symbols_map, self.event_queue, self.order_book, self.portfolio_server, self.logger)
+        self.order_manager = OrderManager(self.symbols_map, self.event_queue, self.order_book, self.portfolio_server, self.logger)
 
         if self.mode == Mode.LIVE:
             self._set_live_environment()
@@ -101,6 +104,10 @@ class Config:
         # Handlers
         self.contract_handler = ContractManager(self.live_data_client, self.logger) # TODO: CAN ADD to the Data CLIENT AND/OR TRADE CLIENT
 
+        for ticker, symbol in self.symbols_map.items():
+            if not self.contract_handler.validate_contract(symbol.contract):
+                raise RuntimeError(f"{ticker} invalid contract.")
+
     def _set_backtest_environment(self):
         from midas.gateways.backtest import (DataClient, BrokerClient, DummyBroker)
 
@@ -115,7 +122,7 @@ class Config:
 
     def load_live_data(self):
         try:
-            for _, symbol in self.symbols_map.items(): 
+            for _, symbol in self.symbols_map.items():
                 self.live_data_client.get_data(data_type=self.params.data_type, contract=symbol.contract) 
         except ValueError:
             raise ValueError(f"Error loading live data for symbol {symbol.ticker}.")

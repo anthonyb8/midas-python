@@ -1,21 +1,22 @@
-import unittest
 import random
-from unittest.mock import Mock, patch
-from contextlib import ExitStack
-from pandas.testing import assert_frame_equal
+import unittest
 import pandas as pd
+from contextlib import ExitStack
+from unittest.mock import Mock, patch
+from pandas.testing import assert_frame_equal
 
-from midas.command import Config, Mode, Parameters
-from midas.events import MarketDataType
-from midas.symbols import Future, Equity, Currency, Exchange
 from midas.order_book import OrderBook
+from midas.events import MarketDataType
 from midas.strategies import BaseStrategy
-from midas.order_manager import OrderManager
-from midas.portfolio import PortfolioServer
-from midas.performance import PerformanceManager
-from midas.utils.database import DatabaseClient
 from midas.utils.logger import SystemLogger
+from midas.portfolio import PortfolioServer
+from midas.order_manager import OrderManager
+from midas.utils.database import DatabaseClient
+from midas.performance import PerformanceManager
+from midas.command import Config, Mode, Parameters
+from midas.symbols.symbols import Future, Equity, Currency, Exchange
 
+#TODO: edge cases
 class TestConfig(unittest.TestCase):    
     def setUp(self) -> None:
         self.valid_symbols = [
@@ -24,9 +25,8 @@ class TestConfig(unittest.TestCase):
         ]
         self.params = Parameters(strategy_name = "Testing",
                             capital = 1000000,
-                            data_type = random.choice([MarketDataType.BAR, MarketDataType.TICK]),
+                            data_type = random.choice([MarketDataType.BAR, MarketDataType.QUOTE]),
                             missing_values_strategy = random.choice(['drop', 'fill_forward']),
-                            strategy_allocation = 1.0,
                             train_start =  "2020-05-18",
                             train_end = "2023-12-31",
                             test_start = "2024-01-01",
@@ -334,11 +334,13 @@ class TestConfig(unittest.TestCase):
         class TestStrategy(BaseStrategy):
             def __init__(self, symbols_map, train_data, portfolio_server, logger, order_book,event_queue):
                 pass
-            def asset_allocation(self):
+            def prepare(self):
+                pass 
+            def _asset_allocation(self):
                 pass
-            def entry_signal(self):
+            def _entry_signal(self):
                 pass
-            def exit_signal(self):
+            def _exit_signal(self):
                 pass
             def handle_market_data(self):
                 pass

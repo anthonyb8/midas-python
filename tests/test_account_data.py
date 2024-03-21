@@ -1,9 +1,7 @@
 import unittest
 import random
-from datetime import datetime
 
 from midas.account_data import Position, Trade
-
 
 #TODO:  Edge case testing 
 
@@ -292,10 +290,10 @@ class TestPosition(unittest.TestCase):
 
 class TestTrade(unittest.TestCase):
     def setUp(self) -> None:
-        self.valid_trade_id = '1'
-        self.valid_leg_id = '2'
-        self.valid_timetamp = datetime(2024,1,1) 
-        self.valid_symbol = 'HEJ4'
+        self.valid_trade_id = 1
+        self.valid_leg_id = 2
+        self.valid_timetamp = 16555000
+        self.valid_ticker = 'HEJ4'
         self.valid_quantity = 10
         self.valid_price= 85.98
         self.valid_cost = 900.90
@@ -307,7 +305,7 @@ class TestTrade(unittest.TestCase):
         trade = Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -317,7 +315,7 @@ class TestTrade(unittest.TestCase):
         self.assertEqual(trade.trade_id, self.valid_trade_id)
         self.assertEqual(trade.leg_id, self.valid_leg_id)
         self.assertEqual(trade.timestamp, self.valid_timetamp)
-        self.assertEqual(trade.symbol, self.valid_symbol)
+        self.assertEqual(trade.ticker, self.valid_ticker)
         self.assertEqual(trade.quantity, self.valid_quantity)
         self.assertEqual(trade.price, self.valid_price)
         self.assertEqual(trade.cost, self.valid_cost)
@@ -326,11 +324,11 @@ class TestTrade(unittest.TestCase):
 
     # Type Validation
     def test_trade_id_type_validation(self):
-        with self.assertRaisesRegex(TypeError,"'trade_id' must be of type str"):
-            Trade(trade_id=1,
+        with self.assertRaisesRegex(TypeError,"'trade_id' must be of type int"):
+            Trade(trade_id="1",
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -338,11 +336,11 @@ class TestTrade(unittest.TestCase):
                       fees=self.valid_fees)
             
     def test_leg_id_type_validation(self):
-        with self.assertRaisesRegex(TypeError,"'leg_id' must be of type str"):
+        with self.assertRaisesRegex(TypeError,"'leg_id' must be of type int"):
             Trade(trade_id=self.valid_trade_id,
-                      leg_id=2,
+                      leg_id="2",
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -350,23 +348,23 @@ class TestTrade(unittest.TestCase):
                       fees=self.valid_fees)
             
     def test_timestamp_type_validation(self):
-        with self.assertRaisesRegex(TypeError,"'timestamp' must be of type datetime"):
+        with self.assertRaisesRegex(TypeError,"'timestamp' should be in UNIX format of type float or int"):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp="2022-08-08",
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
                       action=self.valid_action,
                       fees=self.valid_fees)
             
-    def test_symbol_type_validation(self):
-        with self.assertRaisesRegex(TypeError,"'symbol' must be of type str"):
+    def test_ticker_type_validation(self):
+        with self.assertRaisesRegex(TypeError,"'ticker' must be of type str"):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=1234,
+                      ticker=1234,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -378,7 +376,7 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity="1234",
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -390,7 +388,7 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price="90.9",
                       cost=self.valid_cost,
@@ -402,7 +400,7 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost="90.90",
@@ -414,7 +412,7 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -426,7 +424,7 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
@@ -435,15 +433,15 @@ class TestTrade(unittest.TestCase):
             
     # Constraint validation
     def test_action_constraint(self):
-        with self.assertRaisesRegex(ValueError,"'action' must be either 'BUY' or 'SELL'"):
+        with self.assertRaisesRegex(ValueError,"'action' must be either 'BUY', 'SELL', 'LONG', 'SHORT', 'COVER'"):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=self.valid_price,
                       cost=self.valid_cost,
-                      action='LONG',
+                      action='long',
                       fees=self.valid_fees)
             
     def test_price_negative_constraint(self):
@@ -451,7 +449,7 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=-1.0,
                       cost=self.valid_cost,
@@ -463,34 +461,13 @@ class TestTrade(unittest.TestCase):
             Trade(trade_id=self.valid_trade_id,
                       leg_id=self.valid_leg_id,
                       timestamp=self.valid_timetamp,
-                      symbol=self.valid_symbol,
+                      ticker=self.valid_ticker,
                       quantity=self.valid_quantity,
                       price=0.0,
                       cost=self.valid_cost,
                       action=self.valid_action,
                       fees=self.valid_fees)
 
-
-#      Basic Construction: You've tested that a Position object can be instantiated with valid parameters.
-# Equality and Inequality: Through various scenarios, you've checked that the __eq__ method correctly identifies when two Position objects should be considered equal or not.
-# Type and Constraint Validations: You've tested that your class raises appropriate errors when initialized with incorrect types or values that violate defined constraints.
-# Given this comprehensive coverage, here are some potential edge cases and additional tests you might consider:
-
-# Floating-Point Precision: Test cases where floating-point arithmetic might lead to precision issues in comparisons, especially for avg_cost, initial_margin, total_cost, and market_value.
-
-# Extreme Values: Test with boundary values for each attribute, such as the maximum and minimum possible integers and floating-point numbers, to ensure your class handles them gracefully.
-
-# Optional Attributes: Explicitly test cases where optional attributes (multiplier, initial_margin, total_cost, market_value) are None to ensure your class behaves correctly in their absence, especially in the __eq__ method.
-
-# Mixed Types in Comparison: For attributes that accept multiple types (int or float), test comparisons where one Position object has an attribute as int and another as float with the same logical value (e.g., avg_cost=10 vs. avg_cost=10.0) to ensure equality checks work as expected.
-
-# Negative Quantities: Although not explicitly mentioned, if your domain logic allows, testing with negative quantities could be interesting, depending on whether such scenarios are valid in your application's context.
-
-# Comprehensive Equality Check: Ensure that all attributes are included in the __eq__ method's comparison logic. Your current implementation omits market_value from the comparison. If this omission was unintentional, adding it would be necessary to fully validate object equality.
-
-# Serialization/Deserialization: If your Position objects are ever serialized to a string format (e.g., JSON) and deserialized back, tests to ensure that the object remains consistent through these processes could be beneficial.
-
-# Immutability Checks: Since you're using dataclasses, consider testing for immutability if your Position objects are not meant to be changed after creation. This would involve attempts to modify attributes after object creation and ensuring that either it's not possible or does not affect equality comparisons inappropriately.   
 
 if __name__ =="__main__":
     unittest.main()

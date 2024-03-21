@@ -1,7 +1,7 @@
-from queue import Queue
 import pandas as pd
-from typing import Dict, List
+from queue import Queue
 from datetime import datetime
+from typing import Dict, List
 
 from midas.events import MarketEvent, BarData
 from midas.utils.database import DatabaseClient
@@ -83,9 +83,12 @@ class DataClient(DatabaseClient):
         if missing_values_strategy == 'drop':
             data.dropna(inplace=True)
         elif missing_values_strategy == 'fill_forward':
-            data.fillna(method='ffill', inplace=True)
+            if data.iloc[0].isnull().any(): # Check if the first row contains NaN values
+                raise ValueError("Cannot forward fill as the first row contains NaN values. Consider using another imputation method or manually handling these cases.")
+            
+            data.ffill(inplace=True)
 
-        return data.stack(level='symbol').reset_index()
+        return data.stack(level='symbol', future_stack=True).reset_index()
 
     def _process_bardata(self, data:pd.DataFrame):
         """ Transform the data provide by the database into the needed format for the backtest. """

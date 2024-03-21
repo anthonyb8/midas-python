@@ -5,7 +5,7 @@ from typing  import  Dict, Union
 from dataclasses import dataclass, field
 
 class MarketDataType(Enum):
-    QUOTE = 'QUOTE' # TICK
+    QUOTE = 'QUOTE' 
     BAR = 'BAR'
 
 @dataclass

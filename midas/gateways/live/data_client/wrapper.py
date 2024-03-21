@@ -2,8 +2,10 @@ import os
 import logging
 import threading
 from queue import Queue
+from decimal import Decimal
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
+from ibapi.contract import ContractDetails
 
 from midas.events import MarketEvent, BarData
 
@@ -30,7 +32,7 @@ class DataApp(EWrapper, EClient):
         # Thread Locks
         self.next_valid_order_id_lock = threading.Lock()
 
-    def error(self, reqId, errorCode, errorString):
+    def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str=None):
         super().error(reqId, errorCode, errorString)
         if errorCode == 502: # Error for wrong port
             self.logger.critical(f"Port Error : {errorCode} incorrect port entered.")
@@ -52,7 +54,7 @@ class DataApp(EWrapper, EClient):
         self.logger.info('Closed Data Connection.')
 
     #### wrapper function for reqIds() -> This function manages the Order ID.
-    def nextValidId(self, orderId):
+    def nextValidId(self, orderId: int):
         super().nextValidId(orderId)
         with self.next_valid_order_id_lock:
             self.next_valid_order_id = orderId
@@ -60,18 +62,18 @@ class DataApp(EWrapper, EClient):
         self.logger.info(f"Next Valid Id {self.next_valid_order_id}")
         self.valid_id_event.set()
 
-    def contractDetails(self, reqId, contractDetails):
+    def contractDetails(self, reqId: int, contractDetails: ContractDetails):
         self.is_valid_contract = True
 
-    def contractDetailsEnd(self, reqId):
+    def contractDetailsEnd(self, reqId: int):
         self.validate_contract_event.set()
     
-    def realtimeBar(self, reqId: int, time: int, open: float, high: float, low: float, close: float, volume: int, wap: float, count: int):
+    def realtimeBar(self, reqId: int, time: int, open: float, high: float, low: float, close: float, volume: Decimal, wap: float, count: int):
         super().realtimeBar(reqId, time, open, high, low, close, volume, wap, count)
         """ Updates the real time 5 seconds bars """
         symbol = self.reqId_to_symbol_map[reqId]
 
-        new_bar_entry = BarData(time, open, high, low, close, volume)
+        new_bar_entry = BarData(time, open, high, low, close, float(volume))
         self.current_bar_data[symbol] = new_bar_entry
         
         if len(self.current_bar_data) == len(self.reqId_to_symbol_map):

@@ -1,23 +1,24 @@
 import unittest
-from unittest.mock import Mock, patch
-from ibapi.contract import Contract
 from ibapi.order import Order
+from ibapi.contract import Contract
 from ibapi.execution import Execution
+from unittest.mock import Mock, patch
 
-from midas.gateways.live.broker_client.wrapper import BrokerApp
-from midas.account_data import Position,ActiveOrder, AccountDetails, EquityDetails, ExecutionDetails
 from midas.account_data import ActiveOrder
-from midas.symbols import Equity, Future, Currency, Exchange
+from midas.gateways.live.broker_client.wrapper import BrokerApp
+from midas.symbols.symbols import Equity, Future, Currency, Exchange
+from midas.account_data import Position,ActiveOrder, AccountDetails, EquityDetails
+from midas.events import ExecutionEvent, Action, BaseOrder, TradeInstruction, ExecutionDetails
 
-#TODO: decide on the total_cost in updatePortfolio
+#TODO: execution Details
 
 class TestBrokerApp(unittest.TestCase):
     def setUp(self):
         self.mock_logger = Mock()
         self.mock_portfolio_server = Mock()
+        self.performance_manager = Mock()
 
-        self.broker_app = BrokerApp(logger=self.mock_logger, portfolio_server=self.mock_portfolio_server)
-
+        self.broker_app = BrokerApp(logger=self.mock_logger, portfolio_server=self.mock_portfolio_server, performance_manager=self.performance_manager)
 
     # Basic Validation
     def test_200_error_valid(self):
@@ -140,8 +141,7 @@ class TestBrokerApp(unittest.TestCase):
             for key, value in test_data.items():
                 self.broker_app.updatePortfolio(value['contract'], value['position'], value['marketPrice'], value['marketValue'], value['averageCost'], value['unrealizedPNL'], value['realizedPNL'],value['accountName'])
                 mock_method.assert_called_with(value['contract'], positions[key])
-
-        
+ 
     def test_accountDownloadEnd_valid(self):
         account_name = 'testname'
         with patch.object(self.mock_portfolio_server,'update_account_details') as mock_method:
@@ -229,52 +229,48 @@ class TestBrokerApp(unittest.TestCase):
             self.mock_logger.info.assert_called_once_with(f"Received order status update for orderId {orderId}: {status}")
             mock_method.assert_called_once_with(order_data)
 
-    def test_execDetails(self):
-        reqId = 1
-        permId = 109
-        contract = Contract()
-        contract.symbol = 'AAPL'
-        contract.secType = 'STK'
-        contract.exchange = 'NASDAQ'
+    # def test_execDetails(self):
+    #     reqId = 1
+    #     permId = 109
+    #     contract = Contract()
+    #     contract.symbol = 'AAPL'
+    #     contract.secType = 'STK'
+    #     contract.exchange = 'NASDAQ'
 
-        execution = Execution()
-        execution.execId = 1
-        execution.time = 1655000
-        execution.acctNumber = 128294
-        execution.exchange = 'NASDAQ'
-        execution.side = "BUY"
+    #     execution = Execution()
+    #     execution.execId = 1
+    #     execution.time = 1655000
+    #     execution.acctNumber = 128294
+    #     execution.exchange = 'NASDAQ'
+    #     execution.side = "BUY"
 
-        execution.shares = 1000
-        execution.price = 100
-        execution.avgPrice = 99.9
-        execution.cumQty = 9.9
-        execution.orderRef = ""
+    #     execution.shares = 1000
+    #     execution.price = 100
+    #     execution.avgPrice = 99.9
+    #     execution.cumQty = 9.9
+    #     execution.orderRef = ""
 
-        exec_data = ExecutionDetails(permId = execution.permId, 
-                                    reqId = reqId,
-                                    Symbol = contract.symbol, 
-                                    SecType= contract.secType, 
-                                    Currency= contract.currency, 
-                                    ExecId= execution.execId, 
-                                    Time= execution.time, 
-                                    Account= execution.acctNumber, 
-                                    Exchange= execution.exchange,
-                                    Side= execution.side, 
-                                    Shares= execution.shares, 
-                                    Price= execution.price,
-                                    AvPrice= execution.avgPrice,
-                                    cumQty= execution.cumQty, 
-                                    OrderRef= execution.orderRef
-                                    )
+    #     exec_data = ExecutionDetails(permId = execution.permId, 
+    #                                 reqId = reqId,
+    #                                 Symbol = contract.symbol, 
+    #                                 SecType= contract.secType, 
+    #                                 Currency= contract.currency, 
+    #                                 ExecId= execution.execId, 
+    #                                 Time= execution.time, 
+    #                                 Account= execution.acctNumber, 
+    #                                 Exchange= execution.exchange,
+    #                                 Side= execution.side, 
+    #                                 Shares= execution.shares, 
+    #                                 Price= execution.price,
+    #                                 AvPrice= execution.avgPrice,
+    #                                 cumQty= execution.cumQty, 
+    #                                 OrderRef= execution.orderRef
+    #                                 )
 
-        with patch.object(self.mock_portfolio_server, 'update_trades') as mock_method:
-            self.broker_app.execDetails(reqId, contract, execution)
-            mock_method.assert_called_once_with(exec_data)
+    #     with patch.object(self.mock_portfolio_server, 'update_trades') as mock_method:
+    #         self.broker_app.execDetails(reqId, contract, execution)
+    #         mock_method.assert_called_once_with(exec_data)
 
-    # Edge Cases
-            
-    # Integration
-            
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,11 +1,11 @@
 import logging
+from queue import Queue
 from typing import List, Union
 from abc import ABC, abstractmethod
-from queue import Queue
 
-from midas.events import  SignalEvent, MarketEvent, TradeInstruction
 from midas.order_book import OrderBook
 from midas.portfolio import PortfolioServer
+from midas.events import  SignalEvent, MarketEvent, TradeInstruction
 
 
 class BaseStrategy(ABC):
@@ -24,16 +24,18 @@ class BaseStrategy(ABC):
             symbols_map (Dict[str, Contract]): Mapping of symbol strings to Contract objects.
             event_queue (Queue): Event queue for sending events to other parts of the system.
         """
-        # if not isinstance(order_book, OrderBook):
-        #     raise TypeError("'order_book' must be of type OrderBook instance.")
-        # if not isinstance(event_queue, Queue):
-        #     raise TypeError("'event_queue' must be of type Queue instance.")
-        
-        self._event_queue = event_queue 
-        self.order_book = order_book
         self.logger = logger
+        self.order_book = order_book
+        self._event_queue = event_queue 
         self.portfolio_server = portfolio_server
+
         self.trade_id = 1
+        self.historical_data = None
+
+    @abstractmethod
+    def prepare(self):
+        """ Takes care of any initial set up needed. """
+        pass
     
     def on_market_data(self, event: MarketEvent):
         """
@@ -70,7 +72,7 @@ class BaseStrategy(ABC):
             raise RuntimeError(f"Unexpected error when creating or queuing SignalEvent: {e}") from e
 
     @abstractmethod
-    def entry_signal(self):
+    def _entry_signal(self):
         """
         Generate an entry signal based on market data.
 
@@ -80,7 +82,7 @@ class BaseStrategy(ABC):
         pass
 
     @abstractmethod
-    def exit_signal(self):
+    def _exit_signal(self):
         """
         Generate an exit signal based on market data.
 
@@ -90,8 +92,12 @@ class BaseStrategy(ABC):
         pass
 
     @abstractmethod
-    def asset_allocation(self):
+    def _asset_allocation(self):
         """
         Define the asset allocation strategy.
         """
+        pass
+
+    def generate_signals(self):
+        """ For the vectorized backtest."""
         pass
