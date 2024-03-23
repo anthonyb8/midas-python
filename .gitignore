@@ -10,6 +10,7 @@ heroku_variables.txt
 __pycache__/
 main.todo
 *.egg-info
+*.todo
 
 # Django
 /db.sqlite3
