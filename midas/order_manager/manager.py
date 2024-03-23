@@ -11,7 +11,6 @@ from midas.events import  (SignalEvent, OrderEvent,
                            LimitOrder, MarketOrder, StopLoss, 
                            Action, OrderType, TradeInstruction, BaseOrder)
 
-# TODO : edge case
 
 class OrderManager:
     def __init__(self, symbols_map: Dict[str, Symbol], event_queue: Queue, order_book:OrderBook, portfolio_server: PortfolioServer, logger:logging.Logger):

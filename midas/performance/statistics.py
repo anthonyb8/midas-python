@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
 class PerformanceStatistics:
     @staticmethod
     def validate_trade_log(trade_log: pd.DataFrame):

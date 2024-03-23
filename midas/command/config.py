@@ -1,7 +1,9 @@
 import queue
+import logging
 from enum import Enum
 from typing import Union
 from decouple import config
+from midas_database import DatabaseClient
 
 from .parameters import Parameters
 from midas.order_book import OrderBook
@@ -11,7 +13,6 @@ from midas.utils.logger import SystemLogger
 from midas.portfolio import PortfolioServer
 from midas.order_manager import OrderManager
 from midas.performance import PerformanceManager
-from midas.utils.database import DatabaseClient
 
 
 DATABASE_KEY = config('MIDAS_API_KEY')
@@ -22,7 +23,7 @@ class Mode(Enum):
     BACKTEST = "BACKTEST"
 
 class Config:   
-    def __init__(self, mode: Mode, params: Parameters):
+    def __init__(self, mode: Mode, params: Parameters, logger_output="file", logger_level=logging.INFO):
         if not isinstance(mode, Mode):
             raise ValueError(f"'mode' must be of type Mode enum.")
         
@@ -33,7 +34,7 @@ class Config:
         self.params = params
         self.event_queue = queue.Queue()
         self.database = DatabaseClient(DATABASE_KEY, DATABASE_URL)
-        self.logger = SystemLogger(self.params.strategy_name).logger
+        self.logger = SystemLogger(params.strategy_name, output=logger_output, level=logger_level).logger
 
         # Handlers
         self.order_book: OrderBook
@@ -152,7 +153,7 @@ class Config:
 
         # Get historical data
         tickers = list(self.data_ticker_map.keys())
-        self.hist_data_client.get_data(tickers, self.params.test_start, self.params.test_end,self.params.missing_values_strategy)
+        self.hist_data_client.get_data(tickers, self.params.train_start, self.params.train_end,self.params.missing_values_strategy)
         train_data = self.hist_data_client.data
 
         # # Extract contract details for mapping

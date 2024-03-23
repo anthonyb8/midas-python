@@ -2,9 +2,9 @@ import pandas as pd
 from queue import Queue
 from datetime import datetime
 from typing import Dict, List
+from midas_database import DatabaseClient
 
 from midas.events import MarketEvent, BarData
-from midas.utils.database import DatabaseClient
 
 class DataClient(DatabaseClient):
     def __init__(self, event_queue: Queue, data_client: DatabaseClient):

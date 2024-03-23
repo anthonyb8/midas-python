@@ -1,5 +1,6 @@
-from datetime import datetime
 import signal
+from datetime import datetime
+
 from .config import Config, Mode
 from midas.events import MarketEvent, OrderEvent, SignalEvent, ExecutionEvent
 

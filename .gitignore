@@ -9,11 +9,13 @@ curls.md
 heroku_variables.txt
 __pycache__/
 main.todo
+*.egg-info
 
 # Django
 /db.sqlite3
 /static
 /media
+/build
 
 # Virtual Environment
 venv/

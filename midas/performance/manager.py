@@ -1,12 +1,12 @@
-import logging
-import pandas as pd
-import numpy as np
 import json  
+import logging
+import numpy as np
+import pandas as pd
 from datetime import datetime, timezone
 from typing import List, Dict, Union, TypedDict
+from midas_database import DatabaseClient
 
 from .statistics import PerformanceStatistics
-from midas.utils.database import DatabaseClient
 from midas.account_data import EquityDetails, Trade
 from midas.events import SignalEvent, ExecutionDetails
 # from midas.command.parameters import Parameters

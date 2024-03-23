@@ -11,7 +11,6 @@ from midas.strategies import BaseStrategy
 from midas.utils.logger import SystemLogger
 from midas.portfolio import PortfolioServer
 from midas.order_manager import OrderManager
-from midas.utils.database import DatabaseClient
 from midas.performance import PerformanceManager
 from midas.command import Config, Mode, Parameters
 from midas.symbols.symbols import Future, Equity, Currency, Exchange
@@ -40,7 +39,7 @@ class TestConfig(unittest.TestCase):
         
         with ExitStack() as stack:
             mock_setup = stack.enter_context(patch.object(Config, 'setup'))
-            self.config = Config(mode, self.params)
+            self.config = Config(mode, self.params, logger_output='terminal')
             self.config.live_data_client = Mock()
             self.config.broker_client = Mock()
             
